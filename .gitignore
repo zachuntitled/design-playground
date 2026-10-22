@@ -52,7 +52,10 @@ apps/desktop/vendor/dom-to-pptx/dom-to-pptx.bundle.js
 **/.claude-sessions/*
 
 .cursor/
-.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/verify-open-design/
 .pi/
 .opencode/
 .claude/*
@@ -61,6 +64,7 @@ apps/desktop/vendor/dom-to-pptx/dom-to-pptx.bundle.js
 !.claude/skills/
 .claude/skills/*
 !.claude/skills/od-contribute/
+!.claude/skills/verify-open-design/
 !.claude/commands/
 .claude/commands/*
 !.claude/commands/od-contribute.md
