@@ -312,6 +312,8 @@ jobs:
 
       - name: Typecheck workspaces
         if: ${{ fromJSON(needs.plan.outputs.scopes).run_preflight_typecheck }}
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: |
           pnpm -r --filter '!open-design' --workspace-concurrency="${OPEN_DESIGN_WORKSPACE_CONCURRENCY:-1}" --if-present run typecheck
           pnpm exec tsc -p scripts/tsconfig.json --noEmit
