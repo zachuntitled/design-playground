@@ -2360,6 +2360,104 @@ process.stdin.on("end", () => {
     expect(postMergeWorkflow).not.toContain("PREVIEW_BAKE_TOKEN");
   });
 
+  it("[P1] decides post-merge preview publishing once from main plus the six publishing settings", async () => {
+    const workflow = await readFile(bakePluginPreviewsWorkflowPath, "utf8");
+    const preflightStep = "Decide whether this run publishes (R2 clips + rolling manifest PR)";
+
+    const steps = workflow.slice(workflow.indexOf("    steps:"));
+    expect(steps.indexOf(`- name: ${preflightStep}`)).toBeGreaterThanOrEqual(0);
+    expect(steps.indexOf(`- name: ${preflightStep}`)).toBeLessThan(steps.indexOf("- name: Setup workspace"));
+    expect(workflow).toContain("upload: ${{ steps.publishing.outputs.publish }}");
+    expect(workflow.match(/if: \$\{\{ steps\.publishing\.outputs\.publish == 'true' \}\}/g)).toHaveLength(2);
+    const mintMarker = "      - name: Mint release-bot token for the rolling manifest PR";
+    const manifestMarker = "      - name: Open or update the rolling manifest PR for review";
+    for (const publishingStep of [
+      sectionBetween(workflow, mintMarker, manifestMarker),
+      workflow.slice(workflow.indexOf(manifestMarker)),
+    ]) {
+      expect(publishingStep).toContain("if: ${{ steps.publishing.outputs.publish == 'true' }}");
+    }
+    expect(workflow).not.toContain("github.ref == 'refs/heads/main'");
+    for (const line of workflow.split("\n").filter((candidate) => /^\s+if:/.test(candidate))) {
+      expect(line).not.toContain("secrets.");
+    }
+
+    const script = extractWorkflowRunScript(workflow, preflightStep);
+    const settingNames = [
+      "CLOUDFLARE_R2_REPOSITORY_ASSETS_AK",
+      "CLOUDFLARE_R2_REPOSITORY_ASSETS_SK",
+      "CLOUDFLARE_R2_REPOSITORY_ASSETS_BUCKET",
+      "CLOUDFLARE_R2_REPOSITORY_ASSETS_URL",
+      "RELEASE_BOT_APP_ID",
+      "RELEASE_BOT_PRIVATE_KEY",
+    ] as const;
+    const configured = Object.fromEntries(settingNames.map((name) => [name, `value-of-${name}-do-not-print`]));
+    const absent = Object.fromEntries(settingNames.map((name) => [name, ""]));
+    const preflight = sectionBetween(workflow, `      - name: ${preflightStep}`, "      - name: Checkout");
+    expect(preflight).toContain("REF: ${{ github.ref }}");
+    expect(preflight).toContain("shell: bash");
+    for (const name of settingNames) {
+      expect(preflight).toContain(name + ": ${{ secrets." + name + " }}");
+    }
+
+    async function runPreflight(args: {
+      ref: string;
+      settings: Record<string, string>;
+    }): Promise<{ exitCode: number; output: Record<string, string>; log: string }> {
+      const dir = await mkdtemp(join(tmpdir(), "od-bake-preflight-"));
+      const outputPath = join(dir, "github-output");
+      const env = workflowFixtureEnv({ REF: args.ref, GITHUB_OUTPUT: outputPath, ...args.settings });
+      let exitCode = 0;
+      let log = "";
+      let output: Record<string, string> = {};
+      try {
+        const { stdout, stderr } = await execFileAsync("bash", ["--noprofile", "--norc", "-e", "-o", "pipefail", "-c", script], { cwd: dir, env });
+        log = `${stdout}${stderr}`;
+      } catch (error) {
+        const failed = error as { code?: number; stdout?: string; stderr?: string };
+        exitCode = failed.code ?? 1;
+        log = `${failed.stdout ?? ""}${failed.stderr ?? ""}`;
+      } finally {
+        output = parseGithubOutput(await readFile(outputPath, "utf8").catch(() => ""));
+        await rm(dir, { recursive: true, force: true });
+      }
+      expect(log).not.toContain("do-not-print");
+      return { exitCode, output, log };
+    }
+
+    const fullyConfiguredMain = await runPreflight({ ref: "refs/heads/main", settings: configured });
+    expect(fullyConfiguredMain.exitCode).toBe(0);
+    expect(fullyConfiguredMain.output).toEqual({ publish: "true" });
+
+    const unconfiguredMain = await runPreflight({ ref: "refs/heads/main", settings: absent });
+    expect(unconfiguredMain.exitCode).toBe(0);
+    expect(unconfiguredMain.output).toEqual({ publish: "false" });
+    expect(unconfiguredMain.log).toContain("render-only");
+    expect(unconfiguredMain.log).toContain("::notice::");
+
+    for (const ref of ["refs/heads/feature/x", "refs/heads/chore/plugin-previews"]) {
+      for (const settings of [configured, absent, { ...configured, RELEASE_BOT_APP_ID: "" }]) {
+        const nonMain = await runPreflight({ ref, settings });
+        expect(nonMain.exitCode).toBe(0);
+        expect(nonMain.output).toEqual({ publish: "false" });
+      }
+    }
+
+    for (const missingName of settingNames) {
+      const partial = await runPreflight({
+        ref: "refs/heads/main",
+        settings: { ...configured, [missingName]: "" },
+      });
+      expect(partial.exitCode).not.toBe(0);
+      expect(partial.output).toEqual({});
+      expect(partial.log).toContain(missingName);
+      expect(partial.log).toContain("::error::");
+      for (const presentName of settingNames.filter((name) => name !== missingName)) {
+        expect(partial.log).not.toContain(presentName);
+      }
+    }
+  });
+
   it("[P2] preserves beta linux AppImage smoke reports for platform publication", async () => {
     const workflow = await readFile(releaseBetaWorkflowPath, "utf8");
     const linuxBuildStep = workflow.match(/- name: Build beta linux_x64\r?\n(?:.+\r?\n)+?(?=\r?\n      - name: Write linux_x64 release report)/m);
