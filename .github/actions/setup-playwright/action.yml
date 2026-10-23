@@ -16,22 +16,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Reclaim GitHub-hosted runner disk
-      if: ${{ runner.os == 'Linux' && runner.environment == 'github-hosted' }}
-      shell: bash
-      run: |
-        # The hosted image leaves too little free disk for a Turbopack dev
-        # cache per Playwright worker; the dev server then dies with ENOSPC
-        # and every later test fails with "other side closed".
-        df -h /
-        sudo rm -rf \
-          /usr/share/dotnet \
-          /usr/local/lib/android \
-          /opt/ghc \
-          /usr/local/.ghcup \
-          /opt/hostedtoolcache/CodeQL
-        df -h /
-
     - name: Detect preinstalled Playwright
       id: preinstalled-playwright
       shell: bash

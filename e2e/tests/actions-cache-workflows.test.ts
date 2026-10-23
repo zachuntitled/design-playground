@@ -31,17 +31,6 @@ describe("GitHub Actions cache workflows", () => {
     expect(action).toContain("run: ${{ inputs.install-command }}");
   });
 
-  it("[P1] reclaims disk only on GitHub-hosted Linux before browsers install", async () => {
-    const action = await readFile(setupPlaywrightAction, "utf8");
-    const reclaim = sectionBetween(action, "Reclaim GitHub-hosted runner disk", "- name:");
-
-    expect(reclaim).toContain("runner.os == 'Linux' && runner.environment == 'github-hosted'");
-    expect(reclaim).toContain("/usr/local/lib/android");
-    expect(action.indexOf("Reclaim GitHub-hosted runner disk")).toBeLessThan(
-      action.indexOf("Install Playwright browsers"),
-    );
-  });
-
   it("[P1] pins the Blacksmith apt mirrorlist before installing browser deps", async () => {
     const action = await readFile(setupPlaywrightAction, "utf8");
 
