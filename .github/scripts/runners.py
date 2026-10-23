@@ -31,6 +31,10 @@ EXPECTED_CLASSES = {
     "visual_hot",
 }
 
+# GitHub gives private repositories half-size standard runners (2 vCPU, 7 GB).
+# The UI suites these modes schedule time out or get killed at that size.
+PUBLIC_REPOSITORY_MODES = {"economic"}
+
 
 def load_contract(path: Path):
     config = object_value(load_json(path), "runners")
@@ -80,12 +84,18 @@ def load_contract(path: Path):
     return default_mode, aliases, normalized_modes
 
 
-def resolve(path: Path, requested_mode: Optional[str]):
+def resolve(path: Path, requested_mode: Optional[str], repository_private: bool = False):
     default_mode, aliases, modes = load_contract(path)
     selected = requested_mode or default_mode
     selected = aliases.get(selected, selected)
     if selected not in modes:
         raise ConfigError(f"unknown runner mode: {selected}")
+    if repository_private and selected in PUBLIC_REPOSITORY_MODES:
+        raise ConfigError(
+            f"runner mode {selected} needs a public repository: private repositories get "
+            "2 vCPU / 7 GB GitHub-hosted runners, too small for the UI suites. "
+            "Make the repository public or set OD_CI_RUNNER_MODE=blacksmith."
+        )
     return {
         "runs_on": modes[selected],
         "decision": {"schema_version": 1, "mode": selected},
@@ -96,7 +106,11 @@ def main() -> int:
     root = repository_root(__file__)
     config_path = root / ".github/config/runners.json"
     try:
-        contract = resolve(config_path, os.environ.get("OD_CI_RUNNER_MODE"))
+        contract = resolve(
+            config_path,
+            os.environ.get("OD_CI_RUNNER_MODE"),
+            os.environ.get("OD_REPOSITORY_PRIVATE") == "true",
+        )
     except ConfigError as error:
         print(f"runner configuration error: {error}", file=sys.stderr)
         return 2

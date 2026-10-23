@@ -48,6 +48,7 @@ This file is the single source of truth for agents entering this repository. Rea
 
 ## Local validation scope
 
+- For development setup and proof of web, CLI, or daemon behavior, use the project [verify-open-design skill](.agents/skills/verify-open-design/SKILL.md). Its feature map points to existing harnesses and distinguishes local evidence from CI coverage. Claude discovers the same procedure through `.claude/skills/verify-open-design/SKILL.md`.
 - Run focused tests for changed files and affected integration boundaries.
 - Do not run full daemon or web suites locally unless explicitly requested by the user. This also applies to final regression; full suites run in PR CI.
 - Run `pnpm guard` and `pnpm typecheck` before publication. If CI fails, investigate the failing lane and rerun the relevant focused tests.

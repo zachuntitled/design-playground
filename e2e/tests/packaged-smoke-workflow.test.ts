@@ -301,12 +301,20 @@ async function runScopesPrint(eventName: string, eventPayload: unknown, changedF
   };
 }
 
-async function runRunners(mode?: string): Promise<Record<string, string>> {
+async function runRunners(
+  mode?: string,
+  { repositoryPrivate }: { repositoryPrivate?: boolean } = {},
+): Promise<Record<string, string>> {
   const env = { ...process.env };
   if (mode === undefined) {
     delete env.OD_CI_RUNNER_MODE;
   } else {
     env.OD_CI_RUNNER_MODE = mode;
+  }
+  if (repositoryPrivate === undefined) {
+    delete env.OD_REPOSITORY_PRIVATE;
+  } else {
+    env.OD_REPOSITORY_PRIVATE = String(repositoryPrivate);
   }
   delete env.GITHUB_OUTPUT;
 
@@ -2226,6 +2234,18 @@ process.stdin.on("end", () => {
     expect(economicRunsOn.ui_p0).toEqual(["ubuntu-24.04"]);
     expect(economicRunsOn.ui_p0_heavy).toEqual(["ubuntu-24.04"]);
     expect(economicRunsOn.visual_hot).toEqual(["ubuntu-24.04"]);
+
+    expect(runnerDecision(await runRunners("economic", { repositoryPrivate: false }))).toEqual({
+      schema_version: 1,
+      mode: "economic",
+    });
+    await expect(runRunners("economic", { repositoryPrivate: true })).rejects.toThrow(
+      "runner mode economic needs a public repository",
+    );
+    expect(runnerDecision(await runRunners("blacksmith", { repositoryPrivate: true }))).toEqual({
+      schema_version: 1,
+      mode: "blacksmith",
+    });
 
     for (const invalidMode of ["Economic", " economic "]) {
       await expect(runRunners(invalidMode)).rejects.toThrow("unknown runner mode");
