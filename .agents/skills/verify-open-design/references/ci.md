@@ -27,7 +27,7 @@ Every setup report must distinguish a local pass from an actual GitHub run. Do n
 
 The runner resolver in `ci.yml` defaults same-repository events to the Nexu runner fleet. A fork without that fleet needs an available profile. The existing `economic` mode selects GitHub-hosted Linux and Windows runners from [runners.json](../../../../.github/config/runners.json).
 
-Inspect `OD_CI_RUNNER_MODE` with `gh variable get OD_CI_RUNNER_MODE`. When preparing a fork without private runners, set it to `economic` within the authorized setup scope. This changes runner selection, not test selection. Jobs already queued for an old label need separate handling; a variable update is not evidence they reran.
+Inspect `OD_CI_RUNNER_MODE` with `gh variable get OD_CI_RUNNER_MODE`. When preparing a fork without private runners, set it to `economic` within the authorized setup scope. `economic` requires a public repository. Private repositories get 2 vCPU / 7 GB hosted runners, where the UI suites time out or the runner is killed, so `runners.py` rejects that pairing; a private fork uses `blacksmith` instead. This changes runner selection, not test selection. Jobs already queued for an old label need separate handling; a variable update is not evidence they reran.
 
 The workflow's aggregate gate is distinct from GitHub branch protection. Read actual repository rules before claiming merges are blocked on a check. If GitHub denies access or the plan lacks protection support, report that limitation rather than changing repository visibility or billing.
 
