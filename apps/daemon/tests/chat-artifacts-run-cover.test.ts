@@ -55,6 +55,7 @@ let sidecar: DaemonSidecarHandle;
 let exporterCalls: ExporterCall[] = [];
 let desktopState: DesktopStatusSnapshot['state'] = 'running';
 let desktopStatusError: Error | undefined;
+let desktopStatusProbe: (() => Promise<void>) | undefined;
 let exporterResult: (call: ExporterCall) => Promise<DesktopExportArtifactResult>;
 let renderGate: Promise<void> = Promise.resolve();
 const tempDirs: string[] = [];
@@ -200,6 +201,7 @@ function refsFor(projectId: string, messageId: string): ChatArtifactRef[] {
  */
 async function runTurnThatWritesHtml(options: {
   html?: string;
+  files?: Record<string, Buffer>;
   dialect?: 'v2';
   video?: Buffer;
   metadata?: { kind: 'prototype'; entryFile: string };
@@ -244,11 +246,15 @@ if (${JSON.stringify(options.dialect === 'v2')}) {
   if (!args.includes('--standalone') || !args.includes('--auto') || args.includes('--dir') || args.includes('--pure')) throw new Error('wrong V2 generation argv');
   if (!fs.readFileSync(0, 'utf8').includes('build a page')) throw new Error('missing stdin prompt');
 }
+${options.files ? Object.entries(options.files).map(([name, bytes]) =>
+  `fs.writeFileSync(path.join(process.cwd(), ${JSON.stringify(name)}), Buffer.from(${JSON.stringify(bytes.toString('base64'))}, 'base64'));`,
+).join('\n') : `
 fs.writeFileSync(path.join(process.cwd(), 'style.css'), 'body{background:#0af}/* ${V1_CSS_MARKER} */');
 fs.writeFileSync(
   path.join(process.cwd(), 'index.html'),
   ${JSON.stringify(html)},
 );
+`}
 ${options.video ? `fs.writeFileSync(path.join(process.cwd(), 'clip.mp4'), Buffer.from(${JSON.stringify(options.video.toString('base64'))}, 'base64'));` : ''}
 console.log(JSON.stringify({ type: 'step_start' }));
 console.log(JSON.stringify({ type: 'text', part: { text: 'cwd=' + process.cwd() + '=cwd' } }));
@@ -294,6 +300,7 @@ describe('run terminal HTML cover wiring', () => {
     sidecar = await startDaemonSidecar({ base: dataDir(), namespace: 'cover-test' }, {
       port: 0,
       statusDesktop: async () => {
+        await desktopStatusProbe?.();
         if (desktopStatusError) throw desktopStatusError;
         return {
           state: desktopState,
@@ -319,6 +326,53 @@ describe('run terminal HTML cover wiring', () => {
       await fsp.rm(dir, { recursive: true, force: true });
     }
     await sidecar?.stop();
+  });
+
+  it.each(['image', 'video', 'uncoverable', 'empty'] as const)('finishes %s turns without waiting for desktop discovery', async (kind) => {
+    const files: Record<string, Buffer> = {};
+    if (kind === 'image') files['image.png'] = PNG_1X1;
+    if (kind === 'uncoverable') files['notes.txt'] = Buffer.from('No HTML cover needed.');
+    if (kind === 'video') {
+      const fixtures = await fsp.mkdtemp(join(tmpdir(), 'od-cover-video-'));
+      tempDirs.push(fixtures);
+      const clip = join(fixtures, 'clip.mp4');
+      await promisify(execFile)(ffmpegInstaller.path, [
+        '-y', '-hide_banner', '-loglevel', 'error',
+        '-f', 'lavfi', '-i', 'color=c=red:s=32x32:d=0.1:r=10',
+        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', clip,
+      ]);
+      files['clip.mp4'] = await fsp.readFile(clip);
+    }
+    let release!: () => void;
+    let reportProbe!: () => void;
+    const probeStarted = new Promise<null>((resolve) => { reportProbe = () => resolve(null); });
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    desktopStatusProbe = async () => {
+      reportProbe();
+      await gate;
+    };
+    exporterCalls = [];
+    const pendingTurn = runTurnThatWritesHtml({ files });
+    try {
+      const turn = await Promise.race([pendingTurn, probeStarted]);
+      expect(turn, 'the chat response must finish without requesting desktop status').not.toBeNull();
+      if (!turn) return;
+      const refs = refsFor(turn.projectId, turn.messageId);
+      if (kind === 'image' || kind === 'video') {
+        const ref = refs.find((item) => item.kind === kind);
+        expect(ref?.snapshotState).toBe('ready');
+        const url = kind === 'image' ? ref?.snapshotUrl : ref?.thumbnailUrl;
+        expect(url).toBeTruthy();
+        const bytes = await fetch(`${baseUrl}${url}`);
+        expect(bytes.ok).toBe(true);
+        expect((await bytes.arrayBuffer()).byteLength).toBeGreaterThan(0);
+      }
+      expect(exporterCalls).toEqual([]);
+    } finally {
+      release();
+      await pendingTurn;
+      desktopStatusProbe = undefined;
+    }
   });
 
   it.each(['idle', 'ENOENT', 'ECONNREFUSED'] as const)('skips optional covers for %s without calling the exporter or storing a failure', async (absence) => {
