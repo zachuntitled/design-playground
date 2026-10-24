@@ -30,6 +30,9 @@ import { skillCwdAliasSegment } from '../src/cwd-aliases.js';
 import { amrModelLoadingCache } from '../src/runtimes/amr-model-cache.js';
 import { resetLiveModelsForTests } from '../src/runtimes/models.js';
 import { getAgentDef } from '../src/agents.js';
+import { execAgentFile } from '../src/runtimes/invocation.js';
+import { resolveAgentExecutable } from '../src/runtimes/executables.js';
+import { probeOpenCodeCli } from '../src/runtimes/opencode-cli.js';
 import { readAppConfig, writeAppConfig } from '../src/app-config.js';
 import { readMemoryConfig, writeMemoryConfig } from '../src/memory.js';
 import {
@@ -101,6 +104,33 @@ function killProcessesUsingPath(pathFragment: string): void {
     }
   }
 }
+
+it.each([undefined, process.execPath])('isolates fake OpenCode metadata and restores an override of %s', async (override) => {
+  const previousBin = process.env.OPENCODE_BIN;
+  const previousPath = process.env.PATH;
+  if (override === undefined) delete process.env.OPENCODE_BIN;
+  else process.env.OPENCODE_BIN = override;
+  try {
+    await withFakeAgent('opencode', "console.log('generation');", async () => {
+      const bin = join(process.env.PATH!.split(delimiter)[0]!, process.platform === 'win32' ? 'opencode.cmd' : 'opencode');
+      expect(await execAgentFile(bin, ['--version'], { timeout: 1_000 }))
+        .toMatchObject({ stdout: '1.0.0\n', stderr: '' });
+      expect(await execAgentFile(bin, ['run', '--help'], { timeout: 1_000 }))
+        .toMatchObject({ stdout: 'Usage: opencode run [message..] --format --dir\n', stderr: '' });
+      expect(await probeOpenCodeCli(bin, process.env))
+        .toEqual({ dialect: 'legacy', skipPermissions: false, pure: false });
+      const selected = resolveAgentExecutable(getAgentDef('opencode')!);
+      expect(selected && realpathSync(selected)).toBe(realpathSync(bin));
+      expect(await execAgentFile(selected!, ['run', '--format', 'json'], { timeout: 1_000 }))
+        .toMatchObject({ stdout: 'generation\n', stderr: '' });
+    });
+    expect(process.env.OPENCODE_BIN).toBe(override);
+    expect(process.env.PATH).toBe(previousPath);
+  } finally {
+    if (previousBin === undefined) delete process.env.OPENCODE_BIN;
+    else process.env.OPENCODE_BIN = previousBin;
+  }
+});
 
 describe('/api/chat', () => {
   let server: http.Server;
