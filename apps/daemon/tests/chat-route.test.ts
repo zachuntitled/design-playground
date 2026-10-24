@@ -53,23 +53,40 @@ async function withFakeAgent<T>(
 ): Promise<T> {
   const dir = await fsp.mkdtemp(join(tmpdir(), 'od-chat-route-bin-'));
   const oldPath = process.env.PATH;
+  const oldOpenCodeBin = process.env.OPENCODE_BIN;
+  const bin = join(dir, process.platform === 'win32' ? `${binName}.cmd` : binName);
+  if (binName === 'opencode') {
+    script = `
+if (process.argv.length === 3 && process.argv[2] === '--version') {
+  console.log('1.0.0');
+  process.exit(0);
+}
+if (process.argv.length === 4 && process.argv[2] === 'run' && process.argv[3] === '--help') {
+  console.log('Usage: opencode run [message..] --format --dir');
+  process.exit(0);
+}
+${script}`;
+  }
   try {
     if (process.platform === 'win32') {
       const runner = join(dir, `${binName}-test-runner.cjs`);
       await fsp.writeFile(runner, script);
       await fsp.writeFile(
-        join(dir, `${binName}.cmd`),
+        bin,
         `@echo off\r\nnode "${runner}" %*\r\n`,
       );
     } else {
-      const bin = join(dir, binName);
       await fsp.writeFile(bin, `#!/usr/bin/env node\n${script}`);
       await fsp.chmod(bin, 0o755);
     }
     process.env.PATH = `${dir}${delimiter}${oldPath ?? ''}`;
+    if (binName === 'opencode') process.env.OPENCODE_BIN = bin;
     return await run();
   } finally {
-    process.env.PATH = oldPath;
+    if (oldPath === undefined) delete process.env.PATH;
+    else process.env.PATH = oldPath;
+    if (oldOpenCodeBin === undefined) delete process.env.OPENCODE_BIN;
+    else process.env.OPENCODE_BIN = oldOpenCodeBin;
     killProcessesUsingPath(dir);
     await fsp.rm(dir, { recursive: true, force: true });
   }
@@ -3698,14 +3715,24 @@ setTimeout(() => {
   });
 
   it('marks stalled runs failed even when the child ignores SIGTERM', async () => {
+    const captureDir = mkdtempSync(join(tmpdir(), 'od-stalled-agent-'));
+    tempDirs.push(captureDir);
+    const attemptsPath = join(captureDir, 'attempts.jsonl');
     const previous = process.env.OD_CHAT_RUN_INACTIVITY_TIMEOUT_MS;
     process.env.OD_CHAT_RUN_INACTIVITY_TIMEOUT_MS = '500';
     try {
       await withFakeAgent(
         'opencode',
         `
+const record = (event) => require('node:fs').appendFileSync(
+  ${JSON.stringify(attemptsPath)}, JSON.stringify({ event, pid: process.pid }) + '\\n',
+);
+record('start');
 console.log(JSON.stringify({ type: 'step_start' }));
-process.on('SIGTERM', () => {});
+process.on('SIGTERM', () => {
+  record('SIGTERM');
+  setTimeout(() => record('survived'), 50);
+});
 setInterval(() => {}, 1000);
 `,
         async () => {
@@ -3730,6 +3757,24 @@ setInterval(() => {}, 1000);
 
           expect(eventsBody).toContain('Agent stalled without emitting any new output');
           expect(statusBody.status).toBe('failed');
+          const attempts = readFileSync(attemptsPath, 'utf8').trim().split('\n')
+            .map((line) => JSON.parse(line) as { event: string; pid: number });
+          const starts = attempts.filter(({ event }) => event === 'start');
+          expect(starts).toHaveLength(2);
+          expect(new Set(starts.map(({ pid }) => pid)).size).toBe(2);
+          if (process.platform !== 'win32') {
+            await expect.poll(() => {
+              const records = readFileSync(attemptsPath, 'utf8').trim().split('\n')
+                .map((line) => JSON.parse(line) as { event: string; pid: number });
+              return {
+                signaled: new Set(records.filter(({ event }) => event === 'SIGTERM').map(({ pid }) => pid)),
+                survived: new Set(records.filter(({ event }) => event === 'survived').map(({ pid }) => pid)),
+              };
+            }).toEqual({
+              signaled: new Set(starts.map(({ pid }) => pid)),
+              survived: new Set(starts.map(({ pid }) => pid)),
+            });
+          }
         },
       );
     } finally {
