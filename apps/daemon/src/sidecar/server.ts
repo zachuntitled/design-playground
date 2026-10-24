@@ -114,6 +114,9 @@ export async function startDaemonSidecar(
   const statusDesktop = options.statusDesktop ?? (async () => {
     throw new Error("desktop sidecar is unavailable");
   });
+  const desktopArtifactExporter = async (input: DesktopExportArtifactInput): Promise<DesktopExportArtifactResult> => {
+    return await invokeDesktop<DesktopExportArtifactResult>(SIDECAR_MESSAGES.EXPORT_ARTIFACT, input, 600_000);
+  };
   const serverHandle: StartedDaemonRuntime = await startDaemonRuntime({
     desktopPdfExporter: async (input: DesktopExportPdfInput): Promise<DesktopExportPdfResult> => {
       return await invokeDesktop<DesktopExportPdfResult>(SIDECAR_MESSAGES.EXPORT_PDF, input, 600_000);
@@ -141,8 +144,19 @@ export async function startDaemonSidecar(
     desktopSlideRenderer: async (input: DesktopRenderSlidesInput): Promise<DesktopRenderSlidesResult> => {
       return await invokeDesktop<DesktopRenderSlidesResult>(SIDECAR_MESSAGES.RENDER_SLIDES, input, 600_000);
     },
-    desktopArtifactExporter: async (input: DesktopExportArtifactInput): Promise<DesktopExportArtifactResult> => {
-      return await invokeDesktop<DesktopExportArtifactResult>(SIDECAR_MESSAGES.EXPORT_ARTIFACT, input, 600_000);
+    desktopArtifactExporter,
+    resolveChatArtifactCoverRenderer: async () => {
+      if (!options.statusDesktop || !options.invokeDesktop) return null;
+      try {
+        const status = await statusDesktop(5_000);
+        if (status.state === "idle") return null;
+        if (status.state === "running") return desktopArtifactExporter;
+        throw new Error(`desktop sidecar status is ${status.state}`);
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException | null)?.code;
+        if (code === "ENOENT" || code === "ECONNREFUSED") return null;
+        return async () => { throw error; };
+      }
     },
     ...(options.inheritedEnvironment == null ? {} : { inheritedEnvironment: options.inheritedEnvironment }),
     port: options.port ?? parsePort(process.env[DAEMON_PORT_ENV]),

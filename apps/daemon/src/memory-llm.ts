@@ -45,6 +45,7 @@
 // — produces a record in `memory-extractions.ts` so the settings panel
 // can show running / skipped / success / failed states in real time.
 
+import { openCodeLaunchEnv, probeOpenCodeCli } from './runtimes/opencode-cli.js';
 import { MEMORY_TYPES } from '@open-design/contracts';
 import {
   composeMemoryBody,
@@ -996,6 +997,16 @@ async function callLocalCli(provider, system, user, options) {
     user,
   ].join('\n');
 
+  let env = applyAgentLaunchEnv(
+    spawnEnvForAgent(
+      def.id,
+      { ...process.env, ...(def.env || {}) },
+      configuredAgentEnv,
+      undefined,
+      { resolvedBin: launch.selectedPath },
+    ),
+    launch,
+  );
   let args;
   let stdinText = prompt;
   let parseStdout = (raw) => raw.trim();
@@ -1025,23 +1036,20 @@ async function callLocalCli(provider, system, user, options) {
       [],
       [],
       { model: provider.model },
-      { cwd },
+      {
+        cwd,
+        openCode: {
+          profile: await probeOpenCodeCli(launch.launchPath, env),
+          purpose: 'generation',
+        },
+      },
     );
     parseStdout = (raw) => extractJsonEventText(def.eventParser || def.id, raw, def.name);
   } else {
     throw new Error(`Local CLI memory extraction is not supported for ${provider.agentId}`);
   }
 
-  const env = applyAgentLaunchEnv(
-    spawnEnvForAgent(
-      def.id,
-      { ...process.env, ...(def.env || {}) },
-      configuredAgentEnv,
-      undefined,
-      { resolvedBin: launch.selectedPath },
-    ),
-    launch,
-  );
+  if (provider.agentId === 'opencode') env = openCodeLaunchEnv(env, cwd);
   const invocation = createCommandInvocation({
     command: launch.launchPath,
     args,

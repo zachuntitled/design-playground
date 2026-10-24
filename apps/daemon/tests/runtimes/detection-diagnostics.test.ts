@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { test } from 'vitest';
 import {
   assert,
@@ -99,6 +100,8 @@ posixTest('detectAgents finds OpenCode when npm exposes only the opencode binary
       assert.equal(opencode?.path, bin);
       assert.equal(opencode?.version, 'opencode 1.17.3');
       assert.equal(opencode?.diagnostics, undefined);
+      assert.equal(opencode?.modelsSource, 'live');
+      assert.deepEqual(opencode?.models.map((model) => model.id), ['default', 'openai/gpt-5']);
     });
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -199,6 +202,32 @@ posixTest('detectAgentsStream yields the same agent set as detectAgents', async 
         batch.map((agent) => agent.id).sort(),
         'stream should cover exactly the same agent ids',
       );
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+
+posixTest('detectAgents uses standalone for the V2 live catalog and preserves aliases', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'od-opencode-v2-catalog-'));
+  try {
+    await withEnvSnapshot(['PATH', 'OD_AGENT_HOME'], async () => {
+      const bin = join(dir, 'opencode');
+      writeFileSync(bin, `#!/bin/sh
+if [ "$1" = "--version" ]; then echo "2.1.4"; exit 0; fi
+if [ "$1" = "run" ] && [ "$2" = "--help" ]; then printf '%s' '${readFileSync(new URL('../fixtures/opencode-v2/opencode-run-help.txt', import.meta.url), 'utf8')}'; exit 0; fi
+if [ "$1" = "models" ] && [ "$2" = "--help" ]; then printf '%s' '${readFileSync(new URL('../fixtures/opencode-v2/opencode-models-help.txt', import.meta.url), 'utf8')}'; exit 0; fi
+if [ "$1" = "models" ] && [ "$2" = "--standalone" ]; then echo "openrouter/~anthropic/claude-opus-latest"; exit 0; fi
+exit 1
+`);
+      chmodSync(bin, 0o755);
+      process.env.PATH = dir;
+      process.env.OD_AGENT_HOME = dir;
+      const agent = (await detectAgents()).find((candidate) => candidate.id === 'opencode');
+      assert.equal(agent?.modelsSource, 'live');
+      assert.deepEqual(agent?.models.map((model) => model.id), ['default', 'openrouter/~anthropic/claude-opus-latest']);
+      assert.equal(agent?.models[1]?.reasoningOptions, undefined);
     });
   } finally {
     rmSync(dir, { recursive: true, force: true });

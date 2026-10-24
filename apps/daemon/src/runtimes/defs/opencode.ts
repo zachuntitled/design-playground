@@ -1,3 +1,4 @@
+import { readOpenCodeModelCatalog } from '../opencode-cli.js';
 import { DEFAULT_MODEL_OPTION } from './shared.js';
 import {
   OPENCODE_PERMISSION_CAPABILITY,
@@ -8,7 +9,7 @@ import { getRememberedLiveModels } from '../models.js';
 import type { RuntimeAgentDef, RuntimeModelOption } from '../types.js';
 
 const OPENCODE_VARIANT_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
-const OPENCODE_MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._/:@-]*$/u;
+const OPENCODE_MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*\/~?[A-Za-z0-9][A-Za-z0-9._/:@-]*$/u;
 
 function reasoningOptions(ids: readonly string[]): RuntimeModelOption[] {
   return [
@@ -112,17 +113,7 @@ export const opencodeAgentDef = {
     fallbackBins: ['opencode'],
     versionArgs: ['--version'],
     ...OPENCODE_PERMISSION_CAPABILITY,
-    // `opencode models` prints `provider/model` per line. Real-world
-    // `opencode models` calls can take >8s (network round-trip to the
-    // provider registry), so the previous 8s budget timed out and fell back
-    // to the hardcoded `fallbackModels`, hiding the user's actual catalog.
-    // 15s matches the listModels budget the rest of the agent defs use
-    // (devin, hermes, kiro, kilo, kimi, trae-cli, vibe, reasonix).
-    listModels: {
-      args: ['models', '--verbose'],
-      parse: parseOpenCodeModels,
-      timeoutMs: 15_000,
-    },
+    fetchModels: async (launchPath, env) => parseOpenCodeModels(await readOpenCodeModelCatalog(launchPath, env)),
     fallbackModels: OPENCODE_FALLBACK_MODELS,
     // OpenCode 1.18.x exposes provider/model-specific variants. Detection
     // reads the exact live variant keys from `models --verbose`. The fallback
@@ -141,8 +132,17 @@ export const opencodeAgentDef = {
         '--format',
         'json',
       ];
-      appendOpenCodePermissionBypass(args, 'opencode');
-      appendOpenCodeWorkspaceDir(args, runtimeContext.cwd);
+      const profile = runtimeContext.openCode?.profile;
+      if (profile?.dialect === 'v2') {
+        args.push('--standalone', '--auto');
+      } else {
+        if (profile) {
+          if (profile.skipPermissions) args.push('--dangerously-skip-permissions');
+        } else {
+          appendOpenCodePermissionBypass(args, 'opencode');
+        }
+        appendOpenCodeWorkspaceDir(args, runtimeContext.cwd);
+      }
       // Capture-style resume: OpenCode mints its own session id (reported on
       // the stream as `sessionID`, e.g. `ses_...`). On a follow-up turn the
       // daemon continues that session with `-s <id>` instead of re-sending the
@@ -157,11 +157,15 @@ export const opencodeAgentDef = {
       if (resumeSessionId) {
         args.push('-s', resumeSessionId);
       }
+      const variant = supportsOpenCodeVariant(options.model, options.reasoning) ? options.reasoning : null;
       if (options.model && options.model !== 'default') {
-        args.push('-m', options.model);
+        args.push('-m', profile?.dialect === 'v2' && variant ? `${options.model}#${variant}` : options.model);
       }
-      if (supportsOpenCodeVariant(options.model, options.reasoning)) {
-        args.push('--variant', options.reasoning);
+      if (variant && profile?.dialect !== 'v2') {
+        args.push('--variant', variant);
+      }
+      if (runtimeContext.openCode?.purpose === 'connection-test' && profile?.dialect === 'legacy' && profile.pure) {
+        args.push('--pure');
       }
       return args;
     },

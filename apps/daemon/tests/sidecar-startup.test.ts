@@ -1,3 +1,5 @@
+import type { ChatArtifactCoverRenderer } from '../src/chat-artifacts/cover.js';
+import type { DesktopStatusSnapshot } from '@open-design/sidecar-proto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 import { tmpdir } from 'node:os';
@@ -180,6 +182,68 @@ describe('daemon sidecar startup', () => {
       expect(stop).toHaveBeenCalledOnce();
     } finally {
       release();
+    }
+  });
+});
+
+
+describe('optional cover renderer availability', () => {
+  it('resolves every capture across absent, running, and idle desktop states', async () => {
+    const { startDaemonSidecar } = await import('../src/sidecar/server.js');
+    const statusDesktop = vi.fn<() => Promise<DesktopStatusSnapshot>>()
+      .mockRejectedValueOnce(Object.assign(new Error('missing socket'), { code: 'ENOENT' }))
+      .mockResolvedValueOnce({ state: 'running' } as DesktopStatusSnapshot)
+      .mockResolvedValueOnce({ state: 'idle' } as DesktopStatusSnapshot)
+      .mockRejectedValueOnce(Object.assign(new Error('refused socket'), { code: 'ECONNREFUSED' }));
+    const invokeDesktop = vi.fn().mockResolvedValue({ ok: true, path: '/cover.png', mime: 'image/png' });
+    const handle = await startDaemonSidecar({ base: tmpdir(), namespace: 'cover' }, { statusDesktop, invokeDesktop });
+    try {
+      const options = startDaemonRuntime.mock.lastCall?.[0] as {
+        resolveChatArtifactCoverRenderer: () => Promise<ChatArtifactCoverRenderer | null>;
+        desktopArtifactExporter: ChatArtifactCoverRenderer;
+      };
+      expect(typeof options.resolveChatArtifactCoverRenderer).toBe('function');
+      expect(await options.resolveChatArtifactCoverRenderer()).toBeNull();
+      expect(invokeDesktop).not.toHaveBeenCalled();
+      const renderer = await options.resolveChatArtifactCoverRenderer();
+      expect(renderer).toBe(options.desktopArtifactExporter);
+      const input = { format: 'image', deck: false, title: 'Cover', html: '<p>Frozen input</p>' } satisfies Parameters<ChatArtifactCoverRenderer>[0];
+      await expect(renderer!(input)).resolves.toMatchObject({ ok: true });
+      expect(invokeDesktop).toHaveBeenCalledWith(SIDECAR_MESSAGES.EXPORT_ARTIFACT, input, 600_000);
+      expect(await options.resolveChatArtifactCoverRenderer()).toBeNull();
+      expect(await options.resolveChatArtifactCoverRenderer()).toBeNull();
+      expect(invokeDesktop).toHaveBeenCalledTimes(1);
+    } finally {
+      await handle.stop();
+    }
+  });
+
+  it('keeps unexpected status errors and renderer disappearance observable', async () => {
+    const { startDaemonSidecar } = await import('../src/sidecar/server.js');
+    const statusError = Object.assign(new Error('status timed out'), { code: 'ETIMEDOUT' });
+    const exportError = Object.assign(new Error('renderer disappeared'), { code: 'ENOENT' });
+    const statusDesktop = vi.fn<() => Promise<DesktopStatusSnapshot>>()
+      .mockRejectedValueOnce(statusError)
+      .mockResolvedValueOnce({ state: 'unknown' } as DesktopStatusSnapshot)
+      .mockResolvedValueOnce({ state: 'running' } as DesktopStatusSnapshot);
+    const invokeDesktop = vi.fn().mockRejectedValue(exportError);
+    const handle = await startDaemonSidecar({ base: tmpdir(), namespace: 'cover-errors' }, { statusDesktop, invokeDesktop });
+    try {
+      const options = startDaemonRuntime.mock.lastCall?.[0] as {
+        resolveChatArtifactCoverRenderer: () => Promise<ChatArtifactCoverRenderer | null>;
+        desktopArtifactExporter: ChatArtifactCoverRenderer;
+      };
+      expect(typeof options.resolveChatArtifactCoverRenderer).toBe('function');
+      const failedRenderer = await options.resolveChatArtifactCoverRenderer();
+      await expect(failedRenderer!({} as Parameters<ChatArtifactCoverRenderer>[0])).rejects.toBe(statusError);
+      const unknownRenderer = await options.resolveChatArtifactCoverRenderer();
+      await expect(unknownRenderer!({} as Parameters<ChatArtifactCoverRenderer>[0])).rejects.toThrow('unknown');
+      expect(invokeDesktop).not.toHaveBeenCalled();
+      const renderer = await options.resolveChatArtifactCoverRenderer();
+      await expect(renderer!({} as Parameters<ChatArtifactCoverRenderer>[0])).rejects.toBe(exportError);
+      await expect(options.desktopArtifactExporter({} as Parameters<ChatArtifactCoverRenderer>[0])).rejects.toBe(exportError);
+    } finally {
+      await handle.stop();
     }
   });
 });

@@ -900,7 +900,8 @@ import {
 } from './chat-artifacts/run-capture.js';
 import { associateRunProducedFiles } from './runtimes/run-produced-files.js';
 import { chatArtifactCaptureResultProps } from './chat-artifacts/telemetry.js';
-import { freezeAndRenderChatArtifactCovers } from './chat-artifacts/cover.js';
+import { openCodeLaunchEnv, probeOpenCodeCli } from './runtimes/opencode-cli.js';
+import { freezeAndRenderChatArtifactCovers, type ChatArtifactCoverRenderer } from './chat-artifacts/cover.js';
 import { setMessageArtifactHtmlVersionIds } from './chat-artifacts/store.js';
 import { registerVelaRoutes } from './routes/vela.js';
 import { registerFinalizeRoutes, registerImportRoutes, registerProjectExportRoutes } from './import-export-routes.js';
@@ -3143,6 +3144,7 @@ export interface DaemonRuntimeContext {
 
 export interface StartServerOptions {
   desktopArtifactExporter?: DesktopArtifactExporter | null;
+  resolveChatArtifactCoverRenderer?: () => Promise<ChatArtifactCoverRenderer | null>;
   desktopFrameRenderer?: DesktopFrameRenderer | null;
   desktopPdfExporter?: DesktopPdfExporter | null;
   desktopSlideRenderer?: DesktopSlideRenderer | null;
@@ -3186,6 +3188,7 @@ export async function startServer({
   desktopFrameRenderer = null,
   desktopSlideRenderer = null,
   desktopArtifactExporter = null,
+  resolveChatArtifactCoverRenderer = async () => desktopArtifactExporter,
   runtime = null,
   staticDir = STATIC_DIR,
   inheritedEnvironment = () => ({}),
@@ -12269,7 +12272,7 @@ export async function startServer({
         await freezeAndRenderChatArtifactCovers(deps, {
           projectRoot: outcome.projectRoot,
           rows: captured.rows,
-          renderer: desktopArtifactExporter,
+          renderer: await resolveChatArtifactCoverRenderer(),
           /*
            * The cover outlives the turn by design, so it lands into a message
            * the client already filed as done — after the single post-run
@@ -14198,7 +14201,22 @@ export async function startServer({
       // Optional argv flags are gated on the `--help` capability map, which used
       // to be filled only by `GET /api/agents`. Probe it here so a daemon that
       // has never served that route still builds the same argv as one that has.
-      await ensureDetectedRuntimeCapabilities(def.id, configuredAgentEnv);
+      if (def.id !== 'opencode') await ensureDetectedRuntimeCapabilities(def.id, configuredAgentEnv);
+      const openCode = def.id === 'opencode' && agentLaunch.launchPath
+        ? {
+            profile: await probeOpenCodeCli(agentLaunch.launchPath, applyAgentLaunchEnv(
+              spawnEnvForAgent(
+                def.id,
+                { ...process.env, ...(def.env || {}) },
+                createDaemonDataDirConfiguredAgentEnv(configuredAgentEnv),
+                undefined,
+                { resolvedBin: agentLaunch.selectedPath },
+              ),
+              agentLaunch,
+            )),
+            purpose: 'generation' as const,
+          }
+        : undefined;
       args = def.buildArgs(
         composed,
         promptImagePaths,
@@ -14206,6 +14224,7 @@ export async function startServer({
         agentOptions,
         {
           cwd: effectiveCwd,
+          ...(openCode ? { openCode } : {}),
           hasPriorAssistantTurn,
           agentLogFilePath,
           promptFilePath: promptFile?.path,
@@ -14838,7 +14857,7 @@ export async function startServer({
         def.streamFormat === CODEX_APP_SERVER_STREAM_FORMAT
           ? 'pipe'
           : 'ignore';
-      const env = applyAgentLaunchEnv({
+      let env = applyAgentLaunchEnv({
         ...agentSpawnEnv,
         ...(mmdRouteLaunchEnv || {}),
         ...odMediaEnv,
@@ -14938,6 +14957,7 @@ export async function startServer({
         cleanupOdNextRunInputProjection();
         return;
       }
+      if (def.id === 'opencode') env = openCodeLaunchEnv(env, effectiveCwd);
       spawnedAgentEnv = env;
       const invocation = createCommandInvocation({
         command: agentLaunch.launchPath,

@@ -1,3 +1,4 @@
+import type { OpenCodeInvocation } from './opencode-cli.js';
 import type { ExecFileOptions } from 'node:child_process';
 import type { AgentDiagnostic, ModelMetadata } from '@open-design/contracts';
 
@@ -29,6 +30,7 @@ export type RuntimeBuildOptions = {
 };
 
 export type RuntimeContext = {
+  openCode?: OpenCodeInvocation;
   cwd?: string;
   // True when the current chat run has at least one prior persisted
   // assistant message in the same conversation — i.e. this isn't the
