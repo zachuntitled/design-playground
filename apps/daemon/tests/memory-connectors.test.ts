@@ -1023,9 +1023,12 @@ process.stdout.write(JSON.stringify({
     }
   });
 
-  it('runs OpenCode Local CLI memory extraction with the prompt on stdin', async () => {
+  it.each([['legacy', 'project'], ['v2', 'project'], ['v2', 'fallback']])('runs %s OpenCode Local CLI memory extraction with %s cwd and the prompt on stdin', async (dialect, workspace) => {
     await writeMemoryConfig(dataDir, { extraction: null });
     const tempDir = await fsp.mkdtemp(path.join(tmpdir(), 'od-opencode-memory-'));
+    const projectRoot = workspace === 'project' ? path.join(tempDir, 'managed-project') : undefined;
+    if (projectRoot) await fsp.mkdir(projectRoot);
+    const previousPwd = process.env.PWD;
     const binPath = path.join(tempDir, 'opencode-cli');
     const capturePath = path.join(tempDir, 'capture.json');
     const previousPath = process.env.PATH;
@@ -1042,6 +1045,7 @@ process.stdout.write(JSON.stringify({
       `#!/usr/bin/env node
 const fs = require('node:fs');
 const args = process.argv.slice(2);
+if (args.includes('--help')) { console.error(${JSON.stringify(dialect === 'v2' ? '--standalone --auto provider/model#variant' : '--dir --pure')}); process.exit(0); }
 const stdin = fs.readFileSync(0, 'utf8');
 const files = [];
 const fileFlag = args.findIndex((a) => a === '--file' || a === '-f');
@@ -1051,7 +1055,7 @@ if (fileFlag >= 0) {
     files.push(args[i]);
   }
 }
-fs.writeFileSync(process.env.OD_MEMORY_OPENCODE_ARGS_OUT, JSON.stringify({ args, stdin, files }));
+fs.writeFileSync(process.env.OD_MEMORY_OPENCODE_ARGS_OUT, JSON.stringify({ args, stdin, files, cwd: process.cwd(), pwd: process.env.PWD }));
 for (const f of files) {
   if (!fs.existsSync(f)) {
     process.stderr.write('Error: File not found: ' + f + '\\n');
@@ -1080,10 +1084,11 @@ process.stdout.write(JSON.stringify({
     try {
       process.env.PATH = `${tempDir}${path.delimiter}${previousPath ?? ''}`;
       process.env.OD_MEMORY_OPENCODE_ARGS_OUT = capturePath;
+      process.env.PWD = tempDir;
 
       const result = await suggestMemoryFromConnectors(dataDir, {
         projectsRoot: process.cwd(),
-        projectRoot: process.cwd(),
+        ...(projectRoot ? { projectRoot } : {}),
         connectorIds: ['notion'],
         chatAgentId: 'opencode',
         chatModel: 'openai/gpt-5',
@@ -1110,9 +1115,17 @@ process.stdout.write(JSON.stringify({
       expect(captured.args).not.toContain('--file');
       expect(captured.args).not.toContain('-f');
       expect(captured.files).toEqual([]);
+      expect(captured.cwd).toBe(await fsp.realpath(projectRoot ?? tmpdir()));
+      expect(captured.pwd).toBe(path.resolve(projectRoot ?? tmpdir()));
+      expect(await fsp.realpath(captured.pwd)).toBe(captured.cwd);
+      expect(captured.args.includes('--standalone')).toBe(dialect === 'v2');
+      expect(captured.args.includes('--auto')).toBe(dialect === 'v2');
+      expect(captured.args.includes('--dir')).toBe(dialect === 'legacy');
       expect(captured.stdin).toContain('You are a design-memory extractor');
       expect(captured.stdin).toContain('OpenDesign connector memory should collect design preferences');
     } finally {
+      if (previousPwd == null) delete process.env.PWD;
+      else process.env.PWD = previousPwd;
       if (previousPath == null) {
         delete process.env.PATH;
       } else {

@@ -2467,3 +2467,22 @@ test('antigravity stream still parses Gemini-CLI-shaped JSONL from agy-compatibl
     { type: 'text_delta', delta: 'Hello from Antigravity.' },
   ]);
 });
+
+
+test('OpenCode V2 recorded native tools retain part.id and emit each result once', () => {
+  const recording = readFileSync(new URL('../fixtures/opencode-v2/native-cwd.jsonl', import.meta.url), 'utf8');
+  const { events, handler } = collectEvents('opencode');
+  handler.feed(recording);
+  handler.feed(recording);
+  handler.flush();
+  const uses = events.filter((event) => event.type === 'tool_use');
+  const results = events.filter((event) => event.type === 'tool_result');
+  assert.deepEqual(uses.map((event) => [event.id, event.name]), [
+    ['toolu_014kpd5XLUVE4qPw2kL5Ekqh', 'shell'],
+    ['toolu_012FD63awQpBfuixAR9FuS9e', 'write'],
+  ]);
+  assert.deepEqual(results.map((event) => event.toolUseId), uses.map((event) => event.id));
+  assert.equal(results[0]?.content, '/fixture/project\n');
+  assert.equal(results[1]?.content, 'Created file successfully: cwd-proof.txt');
+  assert.equal(events.some((event) => event.type === 'raw'), false);
+});

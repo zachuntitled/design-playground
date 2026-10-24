@@ -16,6 +16,7 @@
 // `/api/proxy/*/stream` routes; both paths share the base URL policy from
 // contracts so Settings and daemon-side checks reject the same hosts.
 
+import { openCodeLaunchEnv, probeOpenCodeCli } from './runtimes/opencode-cli.js';
 import { spawn } from 'node:child_process';
 import { promises as dnsPromises, lookup as dnsLookupCb } from 'node:dns';
 import { promises as fsp } from 'node:fs';
@@ -2579,6 +2580,31 @@ async function testAgentConnectionInternal(
     if (input.agentId === 'opencode' || input.agentId === 'mimo') {
       if (input.agentId === 'opencode') await prepareOpenCodeConnectionTestCwd(tempDir);
     }
+    const baseEnv = spawnEnvForAgent(
+      input.agentId,
+      {
+        ...process.env,
+        ...(def.env || {}),
+      },
+      configuredAgentEnv,
+      undefined,
+      { resolvedBin: executableResolution.selectedPath },
+    );
+    const liveModelScope = input.agentId === 'amr' ? resolveAmrProfile(baseEnv) : null;
+    const mmdRouteLaunchEnv = input.agentId === 'claude'
+      ? await loadMmdRouteLaunchEnv(
+          {
+            ...process.env,
+            ...(def.env || {}),
+            ...configuredAgentEnv,
+          },
+          model,
+        ).catch(() => null)
+      : null;
+    let env = applyAgentLaunchEnv({
+      ...baseEnv,
+      ...(mmdRouteLaunchEnv || {}),
+    }, executableResolution);
     let args: string[];
     try {
       promptFile = await preparePromptFileForAgent(def, SMOKE_PROMPT, 'connection-test');
@@ -2600,17 +2626,19 @@ async function testAgentConnectionInternal(
         },
         {
           cwd: tempDir,
+          ...(input.agentId === 'opencode' ? {
+            openCode: {
+              profile: await probeOpenCodeCli(executableResolution.launchPath, env),
+              purpose: 'connection-test' as const,
+            },
+          } : {}),
           ...(promptFile ? { promptFilePath: promptFile.path } : {}),
           ...(antigravityLogFilePath
             ? { agentLogFilePath: antigravityLogFilePath }
             : {}),
         },
       );
-      // Connection tests should validate the adapter's core CLI path, not
-      // fail on unrelated user-installed OpenCode plugins. `opencode run
-      // --pure` keeps the smoke test isolated while regular chat runs retain
-      // the user's full plugin environment.
-      if ((input.agentId === 'opencode' || input.agentId === 'mimo') && !args.includes('--pure')) {
+      if (input.agentId === 'mimo' && !args.includes('--pure')) {
         args.push('--pure');
       }
       if ((input.agentId === 'opencode' || input.agentId === 'mimo') && !args.includes('--title')) {
@@ -2636,31 +2664,6 @@ async function testAgentConnectionInternal(
       def.promptViaStdin || def.streamFormat === 'acp-json-rpc' || def.streamFormat === 'dsh-profile-jsonl'
         ? 'pipe'
         : 'ignore';
-    const baseEnv = spawnEnvForAgent(
-      input.agentId,
-      {
-        ...process.env,
-        ...(def.env || {}),
-      },
-      configuredAgentEnv,
-      undefined,
-      { resolvedBin: executableResolution.selectedPath },
-    );
-    const liveModelScope = input.agentId === 'amr' ? resolveAmrProfile(baseEnv) : null;
-    const mmdRouteLaunchEnv = input.agentId === 'claude'
-      ? await loadMmdRouteLaunchEnv(
-          {
-            ...process.env,
-            ...(def.env || {}),
-            ...configuredAgentEnv,
-          },
-          model,
-        ).catch(() => null)
-      : null;
-    const env = applyAgentLaunchEnv({
-      ...baseEnv,
-      ...(mmdRouteLaunchEnv || {}),
-    }, executableResolution);
     model = await resolveConnectionTestModelForAgent(
       def,
       model,
@@ -2691,6 +2694,7 @@ async function testAgentConnectionInternal(
         diagnostics: buildDiagnostics(probeOverrides),
       };
     }
+    if (input.agentId === 'opencode') env = openCodeLaunchEnv(env, tempDir);
     const invocation = createCommandInvocation({
       command: executableResolution.launchPath,
       args,

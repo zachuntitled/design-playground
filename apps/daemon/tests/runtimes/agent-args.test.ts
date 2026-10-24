@@ -83,7 +83,6 @@ test('opencode args pass model-supported variants without changing the default a
   const baseArgs = opencode.buildArgs(prompt, [], [], {});
   assert.equal(opencode.promptViaStdin, true);
   assert.equal(opencode.reasoningOptions, undefined);
-  assert.deepEqual(opencode.listModels?.args, ['models', '--verbose']);
   assert.equal(opencode.fallbackModels.find(
     (model) => model.id === 'openai/gpt-5.6-sol',
   )?.reasoningOptions, undefined);
@@ -1294,4 +1293,34 @@ test('promptInputFormat is a string property (or undefined) on every promptViaSt
       `${name}.promptInputFormat must equal ${JSON.stringify(expected)}`,
     );
   }
+});
+
+
+test('OpenCode V2 uses standalone cwd and inline validated variants without leaking stdin into argv', () => {
+  const previous = getRememberedLiveModels('opencode');
+  rememberLiveModels('opencode', [{ id: 'provider/model', label: 'Model', reasoningOptions: [{ id: 'high', label: 'High' }] }]);
+  agentCapabilities.set('opencode', { skipPermissions: true });
+  try {
+    const context = {
+      cwd: '/projects/nested', resumeSessionId: 'ses_existing',
+      openCode: { profile: { dialect: 'v2' }, purpose: 'generation' },
+    } as Parameters<typeof opencode.buildArgs>[4];
+    assert.deepEqual(opencode.buildArgs('full stdin prompt', [], [], { model: 'provider/model', reasoning: 'high' }, context), [
+      'run', '--format', 'json', '--standalone', '--auto', '-s', 'ses_existing', '-m', 'provider/model#high',
+    ]);
+    assert.deepEqual(opencode.buildArgs('full stdin prompt', [], [], { model: 'provider/model', reasoning: 'invented' }, context), [
+      'run', '--format', 'json', '--standalone', '--auto', '-s', 'ses_existing', '-m', 'provider/model',
+    ]);
+  } finally {
+    rememberLiveModels('opencode', previous);
+    agentCapabilities.delete('opencode');
+  }
+});
+
+test('OpenCode live catalog retains the recorded OpenRouter aliases without inventing variants', () => {
+  assert.deepEqual(parseOpenCodeModels('openrouter/~anthropic/claude-opus-latest\nopenrouter/anthropic/claude-opus-5.5\n'), [
+    { id: 'default', label: 'Default (CLI config)' },
+    { id: 'openrouter/~anthropic/claude-opus-latest', label: 'openrouter/~anthropic/claude-opus-latest' },
+    { id: 'openrouter/anthropic/claude-opus-5.5', label: 'openrouter/anthropic/claude-opus-5.5' },
+  ]);
 });

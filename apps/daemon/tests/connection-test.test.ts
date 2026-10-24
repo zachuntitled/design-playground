@@ -160,7 +160,7 @@ async function withOnlyFakeOpenClaude<T>(script: string, run: () => Promise<T>):
 }
 
 async function withFakeOpenCode<T>(script: string, run: () => Promise<T>): Promise<T> {
-  return withFakeAgent('opencode', script, run);
+  return withFakeAgent('opencode', `if (process.argv.includes('--help')) { console.log('--dir --pure'); process.exit(0); }\n${script}`, run);
 }
 
 async function withFakeCursorAgent<T>(script: string, run: () => Promise<T>): Promise<T> {
