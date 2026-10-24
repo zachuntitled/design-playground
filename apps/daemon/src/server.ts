@@ -12272,7 +12272,10 @@ export async function startServer({
         await freezeAndRenderChatArtifactCovers(deps, {
           projectRoot: outcome.projectRoot,
           rows: captured.rows,
-          renderer: await resolveChatArtifactCoverRenderer(),
+          renderer: captured.rows.some((row) =>
+            row.kind === 'html' && row.snapshotId == null && row.workspaceArtifactId != null)
+            ? await resolveChatArtifactCoverRenderer()
+            : null,
           /*
            * The cover outlives the turn by design, so it lands into a message
            * the client already filed as done — after the single post-run
