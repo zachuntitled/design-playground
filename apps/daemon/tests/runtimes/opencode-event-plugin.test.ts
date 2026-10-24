@@ -146,7 +146,7 @@ test.each(['completed', 'error'])('pending row merges into exactly one native %s
   expect(previews[0]!.input).toEqual({});
   expect(previews[1]!.startedAt).toBe(previews[0]!.startedAt);
   const input = { filePath: '/work/large.txt', content: 'x'.repeat(200_000) };
-  const native = { type: 'tool_use', sessionID: 'root', part: { tool: 'write', callID: 'call', state: { status, input, output: 'wrote file', ...(status === 'error' ? { error: 'denied' } : {}) } } };
+  const native = { type: 'tool_use', sessionID: 'root', part: { tool: 'write', callID: 'call', id: 'legacy-part-id', state: { status, input, output: 'wrote file', ...(status === 'error' ? { error: 'denied' } : {}) } } };
   feed(native);
   feed(native);
   preview();

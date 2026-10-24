@@ -15,7 +15,9 @@
  * produced. That is the difference between a cover and a lie.
  */
 
-import type http from 'node:http';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { promises as fsp } from 'node:fs';
@@ -26,9 +28,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type {
   DesktopExportArtifactInput,
   DesktopExportArtifactResult,
+  DesktopStatusSnapshot,
 } from '@open-design/sidecar-proto';
 
-import { startServer } from '../src/server.js';
+import { startDaemonSidecar, type DaemonSidecarHandle } from '../src/sidecar/server.js';
+import { SIDECAR_MESSAGES } from '@open-design/sidecar-proto';
 import { projectChatArtifactRefs } from '../src/chat-artifacts/refs.js';
 import type { ChatArtifactRef } from '../src/chat-artifacts/types.js';
 import { listProjectFileVersions, readProjectFileVersion } from '../src/project-file-versions.js';
@@ -47,8 +51,11 @@ const V2_BODY_MARKER = 'V2-BODY-MARKER';
 type ExporterCall = DesktopExportArtifactInput;
 
 let baseUrl: string;
-let server: http.Server;
+let sidecar: DaemonSidecarHandle;
 let exporterCalls: ExporterCall[] = [];
+let desktopState: DesktopStatusSnapshot['state'] = 'running';
+let desktopStatusError: Error | undefined;
+let desktopStatusProbe: (() => Promise<void>) | undefined;
 let exporterResult: (call: ExporterCall) => Promise<DesktopExportArtifactResult>;
 let renderGate: Promise<void> = Promise.resolve();
 const tempDirs: string[] = [];
@@ -194,6 +201,9 @@ function refsFor(projectId: string, messageId: string): ChatArtifactRef[] {
  */
 async function runTurnThatWritesHtml(options: {
   html?: string;
+  files?: Record<string, Buffer>;
+  dialect?: 'v2';
+  video?: Buffer;
   metadata?: { kind: 'prototype'; entryFile: string };
 } = {}): Promise<{
   projectId: string;
@@ -229,11 +239,23 @@ async function runTurnThatWritesHtml(options: {
   const script = `
 const fs = require('node:fs');
 const path = require('node:path');
+const args = process.argv.slice(2);
+if (args.includes('--help')) { console.log(${JSON.stringify(options.dialect === 'v2' ? '--standalone --auto provider/model#variant' : '--dir --pure')}); process.exit(0); }
+if (args.includes('--version')) { console.log('2.1.4'); process.exit(0); }
+if (${JSON.stringify(options.dialect === 'v2')}) {
+  if (!args.includes('--standalone') || !args.includes('--auto') || args.includes('--dir') || args.includes('--pure')) throw new Error('wrong V2 generation argv');
+  if (!fs.readFileSync(0, 'utf8').includes('build a page')) throw new Error('missing stdin prompt');
+}
+${options.files ? Object.entries(options.files).map(([name, bytes]) =>
+  `fs.writeFileSync(path.join(process.cwd(), ${JSON.stringify(name)}), Buffer.from(${JSON.stringify(bytes.toString('base64'))}, 'base64'));`,
+).join('\n') : `
 fs.writeFileSync(path.join(process.cwd(), 'style.css'), 'body{background:#0af}/* ${V1_CSS_MARKER} */');
 fs.writeFileSync(
   path.join(process.cwd(), 'index.html'),
   ${JSON.stringify(html)},
 );
+`}
+${options.video ? `fs.writeFileSync(path.join(process.cwd(), 'clip.mp4'), Buffer.from(${JSON.stringify(options.video.toString('base64'))}, 'base64'));` : ''}
 console.log(JSON.stringify({ type: 'step_start' }));
 console.log(JSON.stringify({ type: 'text', part: { text: 'cwd=' + process.cwd() + '=cwd' } }));
 console.log(JSON.stringify({ type: 'step_finish', part: { tokens: { input: 1, output: 1 } } }));
@@ -275,24 +297,152 @@ process.exit(0);
 
 describe('run terminal HTML cover wiring', () => {
   beforeAll(async () => {
-    const started = (await startServer({
+    sidecar = await startDaemonSidecar({ base: dataDir(), namespace: 'cover-test' }, {
       port: 0,
-      returnServer: true,
-      desktopArtifactExporter: async (input) => {
-        exporterCalls.push(input);
-        await renderGate;
-        return await exporterResult(input);
+      statusDesktop: async () => {
+        await desktopStatusProbe?.();
+        if (desktopStatusError) throw desktopStatusError;
+        return {
+          state: desktopState,
+          pid: process.pid,
+          updatedAt: new Date().toISOString(),
+          url: null,
+          windowVisible: false,
+        };
       },
-    })) as { url: string; server: http.Server };
-    baseUrl = started.url;
-    server = started.server;
+      invokeDesktop: async <TResult>(action: string, input: unknown): Promise<TResult> => {
+        expect(action).toBe(SIDECAR_MESSAGES.EXPORT_ARTIFACT);
+        const call = input as ExporterCall;
+        exporterCalls.push(call);
+        await renderGate;
+        return await exporterResult(call) as TResult;
+      },
+    });
+    baseUrl = (await sidecar.status()).url!;
   });
 
   afterAll(async () => {
     for (const dir of tempDirs.splice(0)) {
       await fsp.rm(dir, { recursive: true, force: true });
     }
-    if (server) await new Promise<void>((done) => server.close(() => done()));
+    await sidecar?.stop();
+  });
+
+  it.each(['image', 'video', 'uncoverable', 'empty'] as const)('finishes %s turns without waiting for desktop discovery', async (kind) => {
+    const files: Record<string, Buffer> = {};
+    if (kind === 'image') files['image.png'] = PNG_1X1;
+    if (kind === 'uncoverable') files['notes.txt'] = Buffer.from('No HTML cover needed.');
+    if (kind === 'video') {
+      const fixtures = await fsp.mkdtemp(join(tmpdir(), 'od-cover-video-'));
+      tempDirs.push(fixtures);
+      const clip = join(fixtures, 'clip.mp4');
+      await promisify(execFile)(ffmpegInstaller.path, [
+        '-y', '-hide_banner', '-loglevel', 'error',
+        '-f', 'lavfi', '-i', 'color=c=red:s=32x32:d=0.1:r=10',
+        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', clip,
+      ]);
+      files['clip.mp4'] = await fsp.readFile(clip);
+    }
+    let release!: () => void;
+    let reportProbe!: () => void;
+    const probeStarted = new Promise<null>((resolve) => { reportProbe = () => resolve(null); });
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    desktopStatusProbe = async () => {
+      reportProbe();
+      await gate;
+    };
+    exporterCalls = [];
+    const pendingTurn = runTurnThatWritesHtml({ files });
+    try {
+      const turn = await Promise.race([pendingTurn, probeStarted]);
+      expect(turn, 'the chat response must finish without requesting desktop status').not.toBeNull();
+      if (!turn) return;
+      const refs = refsFor(turn.projectId, turn.messageId);
+      if (kind === 'image' || kind === 'video') {
+        const ref = refs.find((item) => item.kind === kind);
+        expect(ref?.snapshotState).toBe('ready');
+        const url = kind === 'image' ? ref?.snapshotUrl : ref?.thumbnailUrl;
+        expect(url).toBeTruthy();
+        const bytes = await fetch(`${baseUrl}${url}`);
+        expect(bytes.ok).toBe(true);
+        expect((await bytes.arrayBuffer()).byteLength).toBeGreaterThan(0);
+      }
+      expect(exporterCalls).toEqual([]);
+    } finally {
+      release();
+      await pendingTurn;
+      desktopStatusProbe = undefined;
+    }
+  });
+
+  it.each(['idle', 'ENOENT', 'ECONNREFUSED'] as const)('skips optional covers for %s without calling the exporter or storing a failure', async (absence) => {
+    exporterCalls = [];
+    desktopState = 'idle';
+    desktopStatusError = absence === 'idle' ? undefined : Object.assign(new Error('desktop absent'), { code: absence });
+    renderGate = Promise.resolve();
+    exporterResult = async () => { throw new Error('desktop absent'); };
+    try {
+      const turn = await runTurnThatWritesHtml({ dialect: 'v2' });
+      const ref = refsFor(turn.projectId, turn.messageId).find((item) => item.label === 'index.html');
+      expect(ref).toBeTruthy();
+      expect(ref?.snapshotState).toBe('legacy_unavailable');
+      expect(ref?.snapshotId).toBeUndefined();
+      expect(ref?.thumbnailUrl).toBeUndefined();
+      expect(exporterCalls).toEqual([]);
+    } finally {
+      desktopState = 'running';
+      desktopStatusError = undefined;
+    }
+  });
+
+  it.each(['ETIMEDOUT', 'unknown'] as const)('records failed HTML covers for %s status discovery while still freezing video', async (failure) => {
+    exporterCalls = [];
+    renderGate = Promise.resolve();
+    desktopState = failure === 'unknown' ? 'unknown' : 'running';
+    desktopStatusError = failure === 'ETIMEDOUT'
+      ? Object.assign(new Error('status timed out'), { code: failure })
+      : undefined;
+    exporterResult = async () => { throw new Error('export must not be attempted after status failure'); };
+    const fixtures = await fsp.mkdtemp(join(tmpdir(), 'od-cover-video-'));
+    tempDirs.push(fixtures);
+    try {
+      const clip = join(fixtures, 'clip.mp4');
+      await promisify(execFile)(ffmpegInstaller.path, [
+        '-y', '-hide_banner', '-loglevel', 'error',
+        '-f', 'lavfi', '-i', 'color=c=red:s=32x32:d=0.1:r=10',
+        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', clip,
+      ]);
+      const turn = await runTurnThatWritesHtml({ video: await fsp.readFile(clip) });
+      const refs = await waitFor(async () => {
+        const response = await fetch(
+          `${baseUrl}/api/projects/${turn.projectId}/conversations/${turn.conversationId}/messages/${turn.messageId}/artifacts`,
+        );
+        expect(response.ok).toBe(true);
+        return (await response.json()) as { artifacts: ChatArtifactRef[] };
+      }, (result) => result.artifacts.some((ref) => ref.label === 'index.html' && ref.snapshotState === 'failed'));
+      const html = refs.artifacts.find((ref) => ref.label === 'index.html');
+      const video = refs.artifacts.find((ref) => ref.label === 'clip.mp4');
+      expect.soft(html?.snapshotState).toBe('failed');
+      expect.soft(video?.snapshotState).toBe('ready');
+      expect(exporterCalls).toEqual([]);
+      const snapshot = withDb((db) => db.prepare(
+        'SELECT snapshot_id AS id FROM message_artifacts WHERE message_id = ? AND label_at_capture = ?',
+      ).get(turn.messageId, 'index.html') as { id: string | null } | undefined);
+      expect(snapshot?.id).toBeTruthy();
+      expect(html?.workspaceArtifactId).toBeTruthy();
+      expect(html?.thumbnailUrl).toBeUndefined();
+      const metadata = await fetch(`${baseUrl}/api/projects/${turn.projectId}/chat-artifact-snapshots/${snapshot!.id}`);
+      expect(metadata.ok).toBe(true);
+      expect(await metadata.json()).toMatchObject({ snapshot: { state: 'failed', failureCode: 'renderer_unavailable' } });
+      expect(video?.thumbnailUrl).toBeTruthy();
+      const thumbnail = await fetch(`${baseUrl}${video!.thumbnailUrl}`);
+      expect(thumbnail.ok).toBe(true);
+      expect(thumbnail.headers.get('content-type')).toContain('image/jpeg');
+      expect((await thumbnail.arrayBuffer()).byteLength).toBeGreaterThan(0);
+    } finally {
+      desktopState = 'running';
+      desktopStatusError = undefined;
+    }
   });
 
   it('attaches a first-viewport cover to the HTML card produced by a finished turn', async () => {
