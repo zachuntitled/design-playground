@@ -14,9 +14,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  runners:
+    name: Resolve runner profiles
+    runs-on: >-
+      ${{ vars.OD_CI_RUNNER_MODE == 'economic' && 'ubuntu-24.04'
+        || (vars.OD_CI_RUNNER_MODE == 'blacksmith'
+          && 'blacksmith-4vcpu-ubuntu-2404'
+          || 'nexu-runners-small') }}
+    outputs:
+      runs_on: ${{ steps.runners.outputs.runs_on }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Resolve runner profiles
+        id: runners
+        env:
+          OD_CI_RUNNER_MODE: ${{ vars.OD_CI_RUNNER_MODE }}
+          OD_REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+        run: python3 .github/scripts/runners.py
+
   baseline:
     name: Capture visual baselines
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    needs: [runners]
+    runs-on: ${{ fromJSON(needs.runners.outputs.runs_on).visual_hot }}
     timeout-minutes: 30
 
     steps:
@@ -29,13 +51,14 @@ jobs:
         uses: ./.github/actions/setup-workspace
         with:
           save-pnpm-cache: 'true'
+          runner-labels: ${{ toJSON(fromJSON(needs.runners.outputs.runs_on).visual_hot) }}
 
       - name: Setup Playwright
         uses: ./.github/actions/setup-playwright
         with:
           package-json-path: e2e/package.json
           install-command: pnpm -C e2e exec playwright install --with-deps chromium
-          runner-labels: '["blacksmith-8vcpu-ubuntu-2404"]'
+          runner-labels: ${{ toJSON(fromJSON(needs.runners.outputs.runs_on).visual_hot) }}
 
       - name: Prebuild workspace type declarations
         run: |

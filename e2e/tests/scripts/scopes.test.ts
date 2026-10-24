@@ -155,6 +155,40 @@ describe("workflow scope planner", () => {
     });
   });
 
+  test.each([
+    "e2e/tests/tools-dev/inspect.test.ts",
+    "e2e/specs/dialog/main.spec.ts",
+    "e2e/tests/scripts/scopes.test.ts",
+    "e2e/vitest.config.ts",
+  ])("routes E2E Vitest inputs to their executor: %s", (file) => {
+    expect(plan("pr", [file])).toMatchObject({
+      scopes: { web_tests_required: true },
+      enabled: { e2e_vitest: true, web_workspace_1: true, web_workspace_2: true },
+      trace: { escalations: [], ruleHits: { "e2e-vitest-sources": 1 } },
+    });
+    const queued = plan("merge-queue", [file]);
+    expect(queued.trace.escalations).toEqual([{ file, reason: "below-threshold" }]);
+    expect(Object.values(queued.scopes).filter((value) => typeof value === "boolean"))
+      .not.toContain(false);
+    expect(queued.enabled.e2e_vitest).toBe(true);
+  });
+
+  test("keeps E2E Vitest routing additive and conservative for mixed changes", () => {
+    expect(plan("pr", ["docs/spec.md"])).toMatchObject({
+      enabled: { e2e_vitest: false },
+      trace: { ruleHits: { "certain-exempt-surface": 1 } },
+    });
+    expect(plan("pr", ["e2e/tests/tools-dev/inspect.test.ts", "docs/spec.md"])).toMatchObject({
+      enabled: { e2e_vitest: true },
+      trace: { escalations: [] },
+    });
+    const mixed = plan("merge-queue", ["e2e/specs/dialog/main.spec.ts", "some-new-root/file.ts"]);
+    expect(mixed.trace.escalations).toHaveLength(2);
+    expect(Object.values(mixed.scopes).filter((value) => typeof value === "boolean"))
+      .not.toContain(false);
+    expect(plan("full", ["e2e/specs/dialog/main.spec.ts"]).enabled.e2e_vitest).toBe(true);
+  });
+
   test("runs planner contract tests for CI control-plane changes", () => {
     const controlPlaneFiles = [
       ".github/config/scopes.json",

@@ -136,6 +136,14 @@
       "effects": ["daemon_tests_required", "web_tests_required"], "confidence": "medium"
     },
     {
+      "id": "e2e-vitest-sources",
+      "match": {
+        "prefixes": ["e2e/tests/", "e2e/specs/"],
+        "exact": ["e2e/vitest.config.ts"]
+      },
+      "effects": ["web_tests_required"], "confidence": "medium"
+    },
+    {
       "id": "tools-dev-sources",
       "match": { "prefixes": ["tools/dev/", "packages/platform/", "packages/sidecar/", "packages/sidecar-proto/"] },
       "effects": ["tools_dev_tests_required"], "confidence": "medium"
