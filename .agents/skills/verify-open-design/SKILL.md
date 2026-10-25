@@ -5,7 +5,11 @@ description: Verify OpenDesign development setup and changes to its web UI, od C
 
 # Verify OpenDesign
 
-Run from the repository root. Read [AGENTS.md](../../../AGENTS.md), then [e2e guidance](../../../e2e/AGENTS.md) before using its harness. Select affected workflows from the [feature map](features/README.md). The [CI reference](references/ci.md) separates automated gates from agent instructions.
+Run from the repository root. Read [AGENTS.md](../../../AGENTS.md), then [e2e guidance](../../../e2e/AGENTS.md) before using its harness. Select affected workflows from the [feature map](features/README.md). The [CI reference](references/ci.md) separates automated gates from agent instructions. For source updates, follow the [update procedure](references/updates.md).
+
+## Preserve the baseline
+
+Before installation or edits, create an ignored evidence directory. Record `git rev-parse HEAD`, `git status --porcelain=v1`, `git diff --binary`, `git diff --cached --binary`, `git remote -v`, `node --version`, and `corepack pnpm --version`. Preserve existing changes and failures. Record command exit codes as well as logs. Do not treat a merged commit as evidence of passing CI.
 
 ## Launch
 
@@ -33,7 +37,7 @@ corepack pnpm -C e2e exec playwright test -c playwright.config.ts ui/critical-sm
 
 These are focused files, not the full web or daemon suites. On later changes, choose the relevant file or case from the map. Do not repeat installation unless dependencies, workspace links, or command entries changed.
 
-For an interactive browser or CLI witness, follow [interactive verification](references/interactive.md). Daemon data setup must follow the root [Daemon data directory contract](../../../AGENTS.md#daemon-data-directory-contract). Test lifecycle belongs to `e2e/lib/tools-dev/`, composed through `e2e/lib/vitest/suite.ts` or `e2e/lib/playwright/suite.ts`. Do not replace those fixtures or hand-spawn servers in tests.
+For an interactive browser or CLI witness, follow [interactive verification](references/interactive.md). When real-provider testing is in scope, extend it with [live generation, native resume, and restart](references/live-agent.md). Daemon data setup must follow the root [Daemon data directory contract](../../../AGENTS.md#daemon-data-directory-contract). Test lifecycle belongs to `e2e/lib/tools-dev/`, composed through `e2e/lib/vitest/suite.ts` or `e2e/lib/playwright/suite.ts`. Do not replace those fixtures or hand-spawn servers in tests.
 
 ## Doctor
 

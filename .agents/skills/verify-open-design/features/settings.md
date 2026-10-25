@@ -21,3 +21,5 @@ For a T3 browser witness, expand the rail and click the visible Settings item th
 ## Gotchas
 
 Collapsed rail content is inert. Visibility alone is not actionability. The existing case uses a DOM click for the settings button; use a normal user click for a separate actionability witness. This recipe covers navigation only. Provider settings, credential handling, and persistence require their own affected tests.
+
+The [live-agent procedure](../references/live-agent.md) covers Local AI onboarding and an installed CLI/model. Onboarding can automatically spawn a real connection probe; count it separately from generation. Settings autosave is delayed, so verify the selected model survives reload before restarting. Do not export unfiltered app configuration or credential files into evidence.

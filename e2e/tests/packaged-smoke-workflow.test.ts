@@ -1961,6 +1961,32 @@ process.stdin.on("end", () => {
     expect(workflow).not.toContain("needs.runners.outputs.blacksmith_default");
   });
 
+  it("[P1] resolves visual baseline runners through the centralized visual profile", async () => {
+    const workflow = await readFile(visualBaselineWorkflowPath, "utf8");
+    const runners = sectionBetween(workflow, "  runners:", "  baseline:");
+    const baseline = workflow.slice(workflow.indexOf("  baseline:"));
+
+    expect(runners).toContain("vars.OD_CI_RUNNER_MODE == 'economic' && 'ubuntu-24.04'");
+    expect(runners).toContain("vars.OD_CI_RUNNER_MODE == 'blacksmith'");
+    expect(runners).toContain("|| 'nexu-runners-small'");
+    expect(runners).toContain("runs_on: ${{ steps.runners.outputs.runs_on }}");
+    expect(runners).toContain("OD_CI_RUNNER_MODE: ${{ vars.OD_CI_RUNNER_MODE }}");
+    expect(runners).toContain("OD_REPOSITORY_PRIVATE: ${{ github.event.repository.private }}");
+    expect(runners).toContain("run: python3 .github/scripts/runners.py");
+    expect(runners).not.toContain("secrets.");
+    expect(runners).not.toContain("setup-workspace");
+    expect(baseline).toContain("needs: [runners]");
+    expect(baseline).toContain("runs-on: ${{ fromJSON(needs.runners.outputs.runs_on).visual_hot }}");
+    expect(baseline.match(/runner-labels: \$\{\{ toJSON\(fromJSON\(needs.runners.outputs.runs_on\).visual_hot\) \}\}/g))
+      .toHaveLength(2);
+    expect(baseline).not.toContain("blacksmith-");
+    expect(workflow).toContain("on:\n  push:\n    branches:\n      - main\n  workflow_dispatch:");
+    expect(workflow).toContain("permissions:\n  contents: read");
+    expect(workflow).not.toMatch(/pull_request|workflow_run|secrets: inherit/);
+    expect(baseline).toContain("- name: Upload baseline screenshots to R2");
+    expect(baseline).toContain("R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}");
+  });
+
   it.each([
     {
       name: "workspace runner assertions",

@@ -22,3 +22,13 @@ The dialog case launches a fake Codex process through the real daemon run path. 
 ## Gotchas
 
 The dialog harness persists the extracted artifact and assistant message through production APIs. This is daemon integration evidence, not proof that the browser's artifact persistence pipeline ran. Use an affected UI case when that pipeline changes. Fake CLI output proves no real model quality, authentication, or provider transport behavior.
+
+## Browser pipeline with a fake native agent
+
+```sh
+corepack pnpm -C e2e exec playwright test -c playwright.config.ts ui/real-daemon-run.test.ts --grep 'real daemon run previews an artifact from a fake OpenCode runtime' --workers=1 --trace on
+```
+
+This case drives the browser against a real daemon and a fake OpenCode executable. It is stronger browser integration evidence than manually persisting fake output, but still makes no real-provider claim. Keep the trace and confirm a nonzero test count. Use `e2e/lib/playwright/artifact-preview.ts` when extending browser assertions: a mounted iframe may be a hidden or pending preview, not the active document.
+
+For installed-provider generation, native continuation, file readback, interaction, and restart, use the [live procedure](../references/live-agent.md). If a preview needs Reload Preview to render, retain the initial failure and report the recovery separately; raw HTTP 200 and a successful run do not prove first-open rendering.

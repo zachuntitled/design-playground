@@ -425,6 +425,26 @@ about 1.6 runner-minutes, avoiding roughly 3.6 runner-minutes and 2.1
 critical-path minutes per qualifying run, or about 166 runner-minutes across
 that replay window.
 
+### E2E Vitest inputs
+
+Rule `e2e-vitest-sources` covers `e2e/tests/`, `e2e/specs/`, and
+`e2e/vitest.config.ts` at medium confidence. It adds `web_tests_required`,
+which currently enables both E2E Vitest and the web workspace workloads.
+This conservatively retains the existing effect-to-workload mapping; it does
+not introduce a new omission boundary. PR edits select `e2e_vitest`, while
+merge-queue edits still escalate to the full plan under the certain-only
+threshold. The packaged `specs/mac.spec.ts`, `specs/linux.spec.ts`, and
+`specs/win.spec.ts` suites
+remain platform- and environment-gated: the ordinary PR lane skips them.
+Their executable acceptance belongs to the applicable packaged smoke workflows. Direct planner tests cover both audited smoke paths,
+the planner's own test, the Vitest config, mixed inputs, and full fallback.
+
+A 100-commit first-parent replay ending at `954fe25f` lost no selected
+workloads in either context. Six PR plans gained both web shards; one of
+those also gained E2E Vitest (the other five already selected it). Merge-queue
+plans were unchanged. This records selection counts, not measured runner
+minutes for the added work.
+
 ## Evidence and evaluation
 
 Shell may fetch file lists and extract logs, but every scope judgment goes
@@ -475,6 +495,6 @@ retention or repeated manual execution has become error-prone.
   separate evidence and containment review.
 - How much does real merge-queue batching discount single-PR replay savings?
 - Adjacent medium-tier gaps remain separate candidate slices:
-  `e2e/tests/**` does not arm E2E Vitest on PRs; `mocks/**` reaches Playwright
+  `mocks/**` reaches Playwright
   through fallback rather than the daemon tests that consume it; manual-hot
   dispatch does not re-derive workspace validation.
