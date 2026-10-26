@@ -190,4 +190,84 @@ describe('lab app shell interactions', () => {
     expect(document.activeElement).toBe(toggle);
     expect(screen.getByRole('region', { name: 'Conversation' }).hasAttribute('inert')).toBe(false);
   });
+  it('restores the workspace after a sidebar round trip through its constrained maximum', () => {
+    containerWidth = 918;
+    render(<AppShellWorkspaceExperiment />);
+    const sidebar = screen.getByRole('separator', { name: 'Resize sidebar' });
+    const workspace = screen.getByRole('separator', { name: 'Resize workspace' });
+    const shell = screen.getByRole('region', { name: 'App shell workspace experiment' });
+    fireEvent.keyDown(sidebar, { key: 'End' });
+    expect(sidebar.getAttribute('aria-valuenow')).toBe('310');
+    expect(workspace.getAttribute('aria-valuenow')).toBe('280');
+    fireEvent.doubleClick(sidebar);
+    expect(sidebar.getAttribute('aria-valuenow')).toBe('272');
+    expect(workspace.getAttribute('aria-valuenow')).toBe('318');
+    expect(shell.style.getPropertyValue('--workspace-width')).toBe('318px');
+  });
+
+  it('preserves the untouched workspace preference through a sidebar resize', () => {
+    containerWidth = 918;
+    render(<AppShellWorkspaceExperiment />);
+    fireEvent.keyDown(screen.getByRole('separator', { name: 'Resize sidebar' }), { key: 'ArrowLeft' });
+    resizeContainer(1400);
+    expect(screen.getByRole('separator', { name: 'Resize workspace' }).getAttribute('aria-valuenow')).toBe('360');
+    expect(screen.getByRole('region', { name: 'App shell workspace experiment' }).style.getPropertyValue('--workspace-width')).toBe('360px');
+  });
+
+  it('resets to the design default even when the workspace is constrained', () => {
+    containerWidth = 950;
+    render(<AppShellWorkspaceExperiment />);
+    const edge = screen.getByRole('separator', { name: 'Resize workspace' });
+    fireEvent.doubleClick(edge);
+    resizeContainer(1400);
+    expect(edge.getAttribute('aria-valuenow')).toBe('360');
+    expect(screen.getByRole('region', { name: 'App shell workspace experiment' }).style.getPropertyValue('--workspace-width')).toBe('360px');
+  });
+
+  it.each([
+    { from: 1200, to: 760, side: 'workspace', role: 'textbox', name: 'Search or enter URL' },
+    { from: 760, to: 560, side: 'sidebar', role: 'button', name: 'New chat' },
+  ])('returns focus before auto-folding the $side', ({ from, to, side, role, name }) => {
+    containerWidth = from;
+    render(<AppShellWorkspaceExperiment />);
+    screen.getByRole(role, { name, exact: true }).focus();
+    resizeContainer(to);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: `Expand ${side}` }));
+    expect(document.activeElement?.closest('[inert]')).toBeNull();
+  });
+
+  it('returns focus to the invoking toggle without pre-focusing it', () => {
+    containerWidth = 760;
+    render(<AppShellWorkspaceExperiment />);
+    const toggle = screen.getByRole('button', { name: 'Expand workspace' });
+    expect(document.activeElement).toBe(document.body);
+    fireEvent.click(toggle);
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Close workspace' }), { key: 'Escape' });
+    expect(document.activeElement).toBe(toggle);
+  });
+
+  it.each(['sidebar', 'workspace'] as const)('reopens auto-folded %s but preserves user folds', (side) => {
+    render(<AppShellWorkspaceExperiment />);
+    resizeContainer(side === 'sidebar' ? 560 : 880);
+    expect(screen.getByRole('button', { name: `Expand ${side}` }).getAttribute('aria-expanded')).toBe('false');
+    resizeContainer(1400);
+    const toggle = screen.getByRole('button', { name: `Collapse ${side}` });
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(toggle);
+    resizeContainer(560);
+    resizeContainer(1400);
+    expect(screen.getByRole('button', { name: `Expand ${side}` }).getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('makes the toolbar inert until the drawer closes', () => {
+    containerWidth = 760;
+    render(<AppShellWorkspaceExperiment />);
+    const toggle = openWorkspace();
+    const toolbar = toggle.closest('header')!;
+    expect(toolbar.hasAttribute('inert')).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Close workspace' }));
+    expect(toolbar.hasAttribute('inert')).toBe(false);
+    expect(document.activeElement).toBe(toggle);
+  });
+
 });
