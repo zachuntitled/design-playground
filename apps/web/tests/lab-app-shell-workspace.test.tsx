@@ -20,7 +20,6 @@ beforeEach(() => {
     Object.defineProperties(style, { borderLeftWidth: { value: '0px' }, borderRightWidth: { value: '0px' } });
     return style;
   });
-  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => containerWidth);
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => ({
     width: containerWidth, height: 620, x: 0, y: 0, top: 0, left: 0, right: containerWidth, bottom: 620, toJSON() {},
   }));

@@ -35,12 +35,16 @@ export function widthForKey(width: number, key: string, shift: boolean, side: Pa
   return resizeWidth(width, action.delta * KEY_STEPS[shift ? 'shift' : 'normal'], side, size);
 }
 
-type ShellMode = 'docked' | 'drawer' | 'compact';
+export type ShellMode = 'docked' | 'drawer' | 'compact';
 
 const DRAWER_BREAKPOINT = 900;
 const COMPACT_BREAKPOINT = 600;
 const MIN_PAGE_WIDTH = 320;
 export const FRAME_GAP = 8;
+// Mirrors the compact sidebar clearance beside the overlay.
+const SIDEBAR_OVERLAY_CLEARANCE = 48;
+// Mirrors the workspace overlay clearance including the page frame gap.
+const WORKSPACE_OVERLAY_CLEARANCE = SIDEBAR_OVERLAY_CLEARANCE + FRAME_GAP;
 export const COLLAPSED_WIDTHS = { sidebar: 0, workspace: FRAME_GAP } as const;
 
 export function shellMode(containerWidth: number): ShellMode {
@@ -56,11 +60,11 @@ function effectiveSize(side: PaneSide, available: number): PaneSize {
 
 export function fitPanes(containerWidth: number, mode: ShellMode, sidebar: PaneState, workspace: PaneState) {
   const budget = Math.max(0, containerWidth - MIN_PAGE_WIDTH - FRAME_GAP);
-  const sidebarSpace = mode === 'compact' ? containerWidth - 48 : budget - (
+  const sidebarSpace = mode === 'compact' ? containerWidth - SIDEBAR_OVERLAY_CLEARANCE : budget - (
     mode !== 'docked' || workspace.collapsed ? COLLAPSED_WIDTHS.workspace : PANE_SIZES.workspace.min
   );
   const sidebarWidth = clampWidth(sidebar.width, effectiveSize('sidebar', Math.max(0, sidebarSpace)));
-  const workspaceSpace = mode !== 'docked' ? Math.min(PANE_SIZES.workspace.default, containerWidth - 56) : budget - (
+  const workspaceSpace = mode !== 'docked' ? Math.min(PANE_SIZES.workspace.default, containerWidth - WORKSPACE_OVERLAY_CLEARANCE) : budget - (
     sidebar.collapsed ? COLLAPSED_WIDTHS.sidebar : sidebarWidth
   );
   const workspaceSize = effectiveSize('workspace', Math.max(0, workspaceSpace));

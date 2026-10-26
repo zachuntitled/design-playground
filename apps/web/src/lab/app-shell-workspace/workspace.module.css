@@ -438,11 +438,45 @@
 
 .notice {
   flex: none;
-  min-height: 16px;
-  margin: 8px 16px 12px;
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  margin: 0 var(--workspace-width) 0 var(--sidebar-width);
+  transition: grid-template-rows 140ms var(--workspace-ease), opacity 140ms var(--workspace-ease);
   text-align: center;
   font-size: 10px;
   color: var(--text-muted);
+}
+
+.noticeOpen {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition-duration: 200ms;
+}
+
+.notice > div {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.notice p {
+  margin: 0 0 8px;
+}
+
+.shell:has(.sidebarCollapsed) .notice {
+  margin-left: var(--frame-gap);
+}
+
+.shell:has(.workspaceCollapsed) .notice {
+  margin-right: var(--frame-gap);
+}
+
+.shell:not([data-mode="docked"]) .notice {
+  margin-inline: var(--frame-gap);
+}
+
+.shell[data-mode="compact"] .notice {
+  margin-inline: 6px;
 }
 
 .workspace {

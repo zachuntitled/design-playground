@@ -412,7 +412,9 @@ export default function AppShellWorkspaceExperiment() {
           </div>
         </aside>
       </div>
-      <p className={styles.notice} role="status">{notice}</p>
+      <div className={`${styles.notice} accordion-collapsible ${notice ? styles.noticeOpen : ''}`} role="status">
+        <div className="accordion-collapsible-inner"><p>{notice}</p></div>
+      </div>
     </section>
   );
 }
