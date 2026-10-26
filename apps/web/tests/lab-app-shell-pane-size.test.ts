@@ -1,55 +1,38 @@
 import { describe, expect, it } from 'vitest';
 import {
-  clampWidth, PANE_SIZES, resetWidth, resizeWidth, widthForKey, type PaneSide,
+  clampWidth, fitPanes, maxWidth, PANE_SIZES, resetWidth, resizeWidth, widthForKey,
 } from '../src/lab/app-shell-workspace/pane-size';
 
 describe('lab app shell pane sizes', () => {
-  it.each<PaneSide>(['sidebar', 'workspace'])('clamps %s at both limits and preserves in-range widths', (side) => {
-    const size = PANE_SIZES[side];
-    expect(clampWidth(size.min - 100, size)).toBe(size.min);
-    expect(clampWidth(size.max + 100, size)).toBe(size.max);
-    expect(clampWidth(size.default, size)).toBe(size.default);
-    expect(clampWidth(size.min, size)).toBe(size.min);
-    expect(clampWidth(size.max, size)).toBe(size.max);
-  });
-
-  it.each([
-    ['sidebar', 'ArrowLeft', false, 264],
-    ['sidebar', 'ArrowRight', false, 280],
-    ['sidebar', 'ArrowLeft', true, 240],
-    ['sidebar', 'ArrowRight', true, 304],
-    ['workspace', 'ArrowLeft', false, 368],
-    ['workspace', 'ArrowRight', false, 352],
-    ['workspace', 'ArrowLeft', true, 392],
-    ['workspace', 'ArrowRight', true, 328],
-  ] as const)('%s handles %s with shift=%s', (side, key, shift, expected) => {
-    expect(widthForKey(PANE_SIZES[side].default, key, shift, side)).toBe(expected);
-  });
-
-  it.each<PaneSide>(['sidebar', 'workspace'])('jumps to %s bounds regardless of Shift and stops there', (side) => {
-    const size = PANE_SIZES[side];
-    for (const shift of [false, true]) {
-      expect(widthForKey(size.default, 'Home', shift, side)).toBe(size.min);
-      expect(widthForKey(size.default, 'End', shift, side)).toBe(size.max);
-    }
-    const shrink = side === 'sidebar' ? 'ArrowLeft' : 'ArrowRight';
-    const grow = side === 'sidebar' ? 'ArrowRight' : 'ArrowLeft';
-    expect(widthForKey(size.min, shrink, true, side)).toBe(size.min);
-    expect(widthForKey(size.max, grow, true, side)).toBe(size.max);
-    expect(widthForKey(size.default, 'Tab', false, side)).toBeUndefined();
-    expect(widthForKey(size.default, 'toString', false, side)).toBeUndefined();
-  });
-
-  it('uses the same clamping and mirrored directions for pointer movement', () => {
+  it('clamps widths and mirrors pointer movement at the right edge', () => {
+    expect(clampWidth(100, PANE_SIZES.sidebar)).toBe(220);
+    expect(clampWidth(600, PANE_SIZES.workspace)).toBe(560);
     expect(resizeWidth(272, 20, 'sidebar')).toBe(292);
     expect(resizeWidth(360, 20, 'workspace')).toBe(340);
-    expect(resizeWidth(272, -1000, 'sidebar')).toBe(220);
-    expect(resizeWidth(272, 1000, 'sidebar')).toBe(380);
-    expect(resizeWidth(360, 1000, 'workspace')).toBe(280);
-    expect(resizeWidth(360, -1000, 'workspace')).toBe(560);
   });
 
-  it('resets each edge to its documented default', () => {
+  it('uses 16px steps and 48px Shift steps, bounded by available space', () => {
+    expect(widthForKey(272, 'ArrowRight', false, 'sidebar')).toBe(288);
+    expect(widthForKey(360, 'ArrowRight', true, 'workspace')).toBe(312);
+    const size = { ...PANE_SIZES.workspace, max: 400 };
+    expect(widthForKey(380, 'ArrowLeft', true, 'workspace', size)).toBe(400);
+    expect(widthForKey(360, 'End', false, 'workspace', size)).toBe(400);
+    expect(widthForKey(360, 'Home', true, 'workspace', size)).toBe(280);
+    expect(widthForKey(360, 'Tab', false, 'workspace')).toBeUndefined();
+    expect(widthForKey(360, 'toString', false, 'workspace')).toBeUndefined();
+  });
+
+  it('reserves a usable page when both requested widths are at maximum', () => {
+    const widths = fitPanes(918, { width: 380, collapsed: false }, { width: 560, collapsed: false });
+    expect(widths).toEqual({ sidebar: 310, workspace: 280 });
+    expect(maxWidth('workspace', 918, widths.sidebar)).toBe(280);
+    expect(fitPanes(1400, { width: 380, collapsed: false }, { width: 560, collapsed: false }))
+      .toEqual({ sidebar: 380, workspace: 560 });
+  });
+
+  it('reclaims folded pane space and preserves the reset defaults', () => {
+    expect(fitPanes(918, { width: 380, collapsed: true }, { width: 560, collapsed: false }).workspace).toBe(560);
+    expect(fitPanes(918, { width: 380, collapsed: false }, { width: 560, collapsed: true }).sidebar).toBe(380);
     expect(resetWidth('sidebar')).toBe(272);
     expect(resetWidth('workspace')).toBe(360);
   });

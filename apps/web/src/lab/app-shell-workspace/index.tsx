@@ -1,11 +1,11 @@
 'use client';
 
 import {
-  useRef, useState, type CSSProperties, type Dispatch, type PointerEvent, type SetStateAction,
+  useLayoutEffect, useRef, useState, type CSSProperties, type Dispatch, type PointerEvent, type SetStateAction,
 } from 'react';
 import { Button, Textarea } from '@open-design/components';
 import { Icon, type IconName } from '../../components/Icon';
-import { PANE_SIZES, resetWidth, resizeWidth, widthForKey, type PaneSide, type PaneState } from './pane-size';
+import { DRAWER_BREAKPOINT, PANE_SIZES, clampWidth, fitPanes, maxWidth, resetWidth, resizeWidth, widthForKey, type PaneSide, type PaneSize, type PaneState } from './pane-size';
 import styles from './workspace.module.css';
 
 const tools: ReadonlyArray<{ id: string; label: string; icon: IconName; shortcut: string }> = [
@@ -25,13 +25,20 @@ const navigation: ReadonlyArray<{ label: string; icon: IconName }> = [
 ];
 const projects = ['Website refresh', 'Brand foundations', 'Product launch'];
 
-function ResizeEdge({ side, pane, setPane }: {
+function ResizeEdge({ side, pane, size, setPane }: {
   side: PaneSide;
   pane: PaneState;
+  size: PaneSize;
   setPane: Dispatch<SetStateAction<PaneState>>;
 }) {
   const drag = useRef<{ pointerId: number; x: number; width: number } | null>(null);
-  const size = PANE_SIZES[side];
+  const edge = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!pane.collapsed || !drag.current) return;
+    const { pointerId } = drag.current;
+    drag.current = null;
+    if (edge.current?.hasPointerCapture(pointerId)) edge.current.releasePointerCapture(pointerId);
+  }, [pane.collapsed]);
 
   function endDrag(event: PointerEvent<HTMLDivElement>) {
     if (drag.current?.pointerId !== event.pointerId) return;
@@ -43,6 +50,7 @@ function ResizeEdge({ side, pane, setPane }: {
 
   return (
     <div
+      ref={edge}
       className={`${styles.resizeEdge} ${side === 'workspace' ? styles.rightEdge : ''}`}
       role="separator"
       aria-label={`Resize ${side}`}
@@ -55,14 +63,14 @@ function ResizeEdge({ side, pane, setPane }: {
       tabIndex={pane.collapsed ? -1 : 0}
       title="Drag or use arrow keys to resize. Shift for larger steps. Double-click to reset."
       onKeyDown={(event) => {
-        const width = widthForKey(pane.width, event.key, event.shiftKey, side);
+        const width = widthForKey(pane.width, event.key, event.shiftKey, side, size);
         if (width === undefined) return;
         event.preventDefault();
         setPane((current) => ({ ...current, width }));
       }}
-      onDoubleClick={() => setPane((current) => ({ ...current, width: resetWidth(side) }))}
+      onDoubleClick={() => setPane((current) => ({ ...current, width: clampWidth(resetWidth(side), size) }))}
       onPointerDown={(event) => {
-        if (event.button !== 0 || !event.isPrimary) return;
+        if (pane.collapsed || event.button !== 0 || !event.isPrimary) return;
         event.preventDefault();
         event.currentTarget.focus();
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -70,8 +78,8 @@ function ResizeEdge({ side, pane, setPane }: {
       }}
       onPointerMove={(event) => {
         const start = drag.current;
-        if (!start || start.pointerId !== event.pointerId) return;
-        const width = resizeWidth(start.width, event.clientX - start.x, side);
+        if (pane.collapsed || !start || start.pointerId !== event.pointerId) return;
+        const width = resizeWidth(start.width, event.clientX - start.x, side, size);
         setPane((current) => ({ ...current, width }));
       }}
       onPointerUp={endDrag}
@@ -136,6 +144,37 @@ export default function AppShellWorkspaceExperiment() {
   const [active, setActive] = useState('Website refresh');
   const [notice, setNotice] = useState('');
   const workspaceToggle = useRef<HTMLButtonElement>(null);
+  const drawerClose = useRef<HTMLButtonElement>(null);
+  const shell = useRef<HTMLElement>(null);
+  const sidebarElement = useRef<HTMLElement>(null);
+  const workspaceElement = useRef<HTMLElement>(null);
+  const pageElement = useRef<HTMLElement>(null);
+  const [containerWidth, setContainerWidth] = useState(1440);
+  const narrow = containerWidth <= DRAWER_BREAKPOINT;
+  const drawerOpen = narrow && !workspace.collapsed;
+  const widths = fitPanes(containerWidth, sidebar, workspace);
+  const sidebarSize = { ...PANE_SIZES.sidebar, max: maxWidth('sidebar', containerWidth, workspace.collapsed ? 8 : widths.workspace) };
+  const workspaceSize = { ...PANE_SIZES.workspace, max: maxWidth('workspace', containerWidth, sidebar.collapsed ? 0 : widths.sidebar) };
+
+  useLayoutEffect(() => {
+    const element = shell.current;
+    if (!element) return;
+    const measure = () => setContainerWidth(element.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useLayoutEffect(() => {
+    sidebarElement.current?.toggleAttribute('inert', sidebar.collapsed || drawerOpen);
+    workspaceElement.current?.toggleAttribute('inert', workspace.collapsed);
+    pageElement.current?.toggleAttribute('inert', drawerOpen);
+  }, [sidebar.collapsed, workspace.collapsed, drawerOpen]);
+
+  useLayoutEffect(() => {
+    if (drawerOpen) drawerClose.current?.focus();
+  }, [drawerOpen]);
 
   function closeWorkspace() {
     setWorkspace((current) => ({ ...current, collapsed: true }));
@@ -144,11 +183,12 @@ export default function AppShellWorkspaceExperiment() {
 
   return (
     <section
+      ref={shell}
       className={styles.shell}
       aria-label="App shell workspace experiment"
-      style={{ '--sidebar-width': `${sidebar.width}px`, '--workspace-width': `${workspace.width}px` } as CSSProperties}
+      style={{ '--sidebar-width': `${widths.sidebar}px`, '--workspace-width': `${widths.workspace}px` } as CSSProperties}
       onKeyDown={(event) => {
-        if (event.key === 'Escape' && !workspace.collapsed) {
+        if (event.key === 'Escape' && drawerOpen) {
           event.preventDefault();
           closeWorkspace();
         }
@@ -183,10 +223,10 @@ export default function AppShellWorkspaceExperiment() {
       </header>
       <div className={styles.body}>
         <aside
+          ref={sidebarElement}
           id="lab-sidebar"
           aria-label="Sidebar"
           className={`${styles.sidebar} ${sidebar.collapsed ? styles.sidebarCollapsed : ''}`}
-          inert={sidebar.collapsed}
         >
           <div className={styles.sidebarInner}>
             <div className={styles.identity}>
@@ -222,9 +262,9 @@ export default function AppShellWorkspaceExperiment() {
               <Icon name="chevron-down" aria-hidden="true" />
             </div>
           </div>
-          <ResizeEdge side="sidebar" pane={sidebar} setPane={setSidebar} />
+          {!narrow && <ResizeEdge side="sidebar" pane={{ ...sidebar, width: widths.sidebar }} size={sidebarSize} setPane={setSidebar} />}
         </aside>
-        <section className={styles.page} aria-label="Conversation">
+        <section ref={pageElement} className={styles.page} aria-label="Conversation">
           <div className={styles.pageHeader}>
             <span><Icon name="comment" size={15} aria-hidden="true" /> {active}</span>
             <span className={styles.draft}>Draft</span>
@@ -279,16 +319,29 @@ export default function AppShellWorkspaceExperiment() {
           onClick={closeWorkspace}
         />
         <aside
+          ref={workspaceElement}
           id="lab-workspace"
           aria-label="Workspace"
           className={`${styles.workspace} ${workspace.collapsed ? styles.workspaceCollapsed : ''}`}
-          inert={workspace.collapsed}
+          onKeyDown={(event) => {
+            if (!drawerOpen || event.key !== 'Tab') return;
+            const controls = event.currentTarget.querySelectorAll<HTMLElement>('button, input');
+            const first = controls[0];
+            const last = controls[controls.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+              event.preventDefault();
+              last?.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+              event.preventDefault();
+              first?.focus();
+            }
+          }}
         >
-          <ResizeEdge side="workspace" pane={workspace} setPane={setWorkspace} />
+          {!narrow && <ResizeEdge side="workspace" pane={{ ...workspace, width: widths.workspace }} size={workspaceSize} setPane={setWorkspace} />}
           <div className={styles.workspaceInner}>
             <div className={styles.drawerHeader}>
               <h2>Workspace</h2>
-              <Button variant="ghost" size="icon" aria-label="Close workspace" onClick={closeWorkspace}>
+              <Button ref={drawerClose} variant="ghost" size="icon" aria-label="Close workspace" onClick={closeWorkspace}>
                 <Icon name="close" size={18} aria-hidden="true" />
               </Button>
             </div>

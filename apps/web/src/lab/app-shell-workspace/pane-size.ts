@@ -18,23 +18,43 @@ const KEY_ACTIONS: Readonly<Record<string, { delta: number } | { boundary: 'min'
   Home: { boundary: 'min' },
   End: { boundary: 'max' },
 };
-const KEY_STEPS = { normal: 8, shift: 32 } as const;
+const KEY_STEPS = { normal: 16, shift: 48 } as const;
 
 export function clampWidth(width: number, size: PaneSize): number {
   return Math.min(size.max, Math.max(size.min, width));
 }
 
-export function resizeWidth(width: number, deltaX: number, side: PaneSide): number {
-  return clampWidth(width + deltaX * PANE_DIRECTIONS[side], PANE_SIZES[side]);
+export function resizeWidth(width: number, deltaX: number, side: PaneSide, size: PaneSize = PANE_SIZES[side]): number {
+  return clampWidth(width + deltaX * PANE_DIRECTIONS[side], size);
 }
 
-export function widthForKey(width: number, key: string, shift: boolean, side: PaneSide): number | undefined {
+export function widthForKey(width: number, key: string, shift: boolean, side: PaneSide, size: PaneSize = PANE_SIZES[side]): number | undefined {
   const action = Object.hasOwn(KEY_ACTIONS, key) ? KEY_ACTIONS[key] : undefined;
   if (!action) return undefined;
-  if ('boundary' in action) return PANE_SIZES[side][action.boundary];
-  return resizeWidth(width, action.delta * KEY_STEPS[shift ? 'shift' : 'normal'], side);
+  if ('boundary' in action) return size[action.boundary];
+  return resizeWidth(width, action.delta * KEY_STEPS[shift ? 'shift' : 'normal'], side, size);
 }
 
 export function resetWidth(side: PaneSide): number {
   return clampWidth(PANE_SIZES[side].default, PANE_SIZES[side]);
+}
+
+export const DRAWER_BREAKPOINT = 900;
+export const MIN_PAGE_WIDTH = 320;
+const FRAME_GAP = 8;
+
+export function maxWidth(side: PaneSide, containerWidth: number, otherWidth: number): number {
+  return Math.min(PANE_SIZES[side].max, Math.max(PANE_SIZES[side].min, containerWidth - otherWidth - MIN_PAGE_WIDTH - FRAME_GAP));
+}
+
+export function fitPanes(containerWidth: number, sidebar: PaneState, workspace: PaneState) {
+  const sidebarWidth = clampWidth(sidebar.width, {
+    ...PANE_SIZES.sidebar,
+    max: maxWidth('sidebar', containerWidth, workspace.collapsed ? FRAME_GAP : PANE_SIZES.workspace.min),
+  });
+  const workspaceWidth = clampWidth(workspace.width, {
+    ...PANE_SIZES.workspace,
+    max: maxWidth('workspace', containerWidth, sidebar.collapsed ? 0 : sidebarWidth),
+  });
+  return { sidebar: sidebarWidth, workspace: workspaceWidth };
 }
