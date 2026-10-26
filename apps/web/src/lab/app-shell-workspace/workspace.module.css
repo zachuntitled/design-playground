@@ -244,7 +244,6 @@
 }
 
 .body:has(.resizeEdge:is(:active, :focus)) :is(.sidebar, .workspace) {
-  overflow: hidden;
   transition: none;
 }
 
@@ -449,6 +448,7 @@
 }
 
 .workspace {
+  overflow: hidden;
   position: relative;
   flex: none;
   width: var(--workspace-width);
