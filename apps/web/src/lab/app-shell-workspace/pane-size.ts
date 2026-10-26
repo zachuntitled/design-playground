@@ -7,7 +7,7 @@ export const PANE_SIZES: Readonly<Record<PaneSide, PaneSize>> = {
   workspace: { default: 360, min: 280, max: 560 },
 };
 
-export const PANE_DIRECTIONS: Readonly<Record<PaneSide, 1 | -1>> = {
+const PANE_DIRECTIONS: Readonly<Record<PaneSide, 1 | -1>> = {
   sidebar: 1,
   workspace: -1,
 };

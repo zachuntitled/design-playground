@@ -22,7 +22,7 @@ describe('lab app shell interactions', () => {
   it('makes folded panes inert and preserves workspace toggle focus', () => {
     render(<AppShellWorkspaceExperiment />);
     const workspace = screen.getByRole('complementary', { name: 'Workspace' });
-    const toggle = screen.getByRole('button', { name: 'Collapse workspace', exact: true });
+    const toggle = screen.getByRole('button', { name: 'Collapse workspace' });
     toggle.focus();
     fireEvent.click(toggle);
     expect(workspace.hasAttribute('inert')).toBe(true);
@@ -31,7 +31,7 @@ describe('lab app shell interactions', () => {
     expect(workspace.hasAttribute('inert')).toBe(false);
     expect(document.activeElement).toBe(toggle);
     const sidebar = screen.getByRole('complementary', { name: 'Sidebar' });
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
     expect(sidebar.hasAttribute('inert')).toBe(true);
   });
 
@@ -43,20 +43,20 @@ describe('lab app shell interactions', () => {
     fireEvent.keyDown(edge, { key: 'ArrowRight', shiftKey: true });
     expect(edge.getAttribute('aria-valuenow')).toBe('336');
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search or enter URL' }), { key: 'Escape' });
-    expect(screen.getByRole('button', { name: 'Collapse workspace', exact: true }).getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Collapse workspace' }).getAttribute('aria-expanded')).toBe('true');
   });
 
   it('focuses the narrow drawer and returns focus when Escape closes it', () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(700);
     render(<AppShellWorkspaceExperiment />);
-    const close = screen.getByRole('button', { name: 'Close workspace', exact: true });
+    const close = screen.getByRole('button', { name: 'Close workspace' });
     expect(document.activeElement).toBe(close);
     expect(screen.getByRole('region', { name: 'Conversation' }).hasAttribute('inert')).toBe(true);
     expect(screen.getByRole('complementary', { name: 'Sidebar' }).hasAttribute('inert')).toBe(true);
     fireEvent.keyDown(close, { key: 'Escape' });
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Expand workspace', exact: true }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Expand workspace' }));
     expect(screen.getByRole('region', { name: 'Conversation' }).hasAttribute('inert')).toBe(false);
-    fireEvent.click(screen.getByRole('button', { name: 'Expand workspace', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Expand workspace' }));
     expect(document.activeElement).toBe(close);
   });
 });

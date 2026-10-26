@@ -1,11 +1,14 @@
 'use client';
 
 import {
-  useLayoutEffect, useRef, useState, type CSSProperties, type Dispatch, type PointerEvent, type SetStateAction,
+  useId, useLayoutEffect, useRef, useState, type CSSProperties, type Dispatch, type PointerEvent, type SetStateAction,
 } from 'react';
 import { Button, Textarea } from '@open-design/components';
 import { Icon, type IconName } from '../../components/Icon';
-import { DRAWER_BREAKPOINT, PANE_SIZES, clampWidth, fitPanes, maxWidth, resetWidth, resizeWidth, widthForKey, type PaneSide, type PaneSize, type PaneState } from './pane-size';
+import {
+  DRAWER_BREAKPOINT, PANE_SIZES, clampWidth, fitPanes, maxWidth, resetWidth, resizeWidth, widthForKey,
+  type PaneSide, type PaneSize, type PaneState,
+} from './pane-size';
 import styles from './workspace.module.css';
 
 const tools: ReadonlyArray<{ id: string; label: string; icon: IconName; shortcut: string }> = [
@@ -13,7 +16,7 @@ const tools: ReadonlyArray<{ id: string; label: string; icon: IconName; shortcut
   { id: 'browser', label: 'Browser', icon: 'globe', shortcut: '⌘⇧B' },
   { id: 'notes', label: 'Notes', icon: 'edit', shortcut: '⌘⇧N' },
 ];
-const sources = [
+const sources: ReadonlyArray<{ id: string; title: string; source: string; mark: string }> = [
   { id: 'geo', title: 'GEO: Generative Engine Optimization', source: 'arxiv.org', mark: 'A' },
   { id: 'tokens', title: 'Design tokens – naming guide', source: 'notion.so', mark: 'N' },
   { id: 'q3', title: 'Q3 launch checklist', source: 'linear.app', mark: 'L' },
@@ -23,7 +26,11 @@ const navigation: ReadonlyArray<{ label: string; icon: IconName }> = [
   { label: 'Folders', icon: 'folder' },
   { label: 'Integrations', icon: 'puzzle' },
 ];
-const projects = ['Website refresh', 'Brand foundations', 'Product launch'];
+const projects: ReadonlyArray<string> = ['Website refresh', 'Brand foundations', 'Product launch'];
+
+function paneId(side: PaneSide) {
+  return `lab-${side}`;
+}
 
 function ResizeEdge({ side, pane, size, setPane }: {
   side: PaneSide;
@@ -54,7 +61,7 @@ function ResizeEdge({ side, pane, size, setPane }: {
       className={`${styles.resizeEdge} ${side === 'workspace' ? styles.rightEdge : ''}`}
       role="separator"
       aria-label={`Resize ${side}`}
-      aria-controls={`lab-${side}`}
+      aria-controls={paneId(side)}
       aria-orientation="vertical"
       aria-valuenow={pane.width}
       aria-valuemin={size.min}
@@ -91,6 +98,8 @@ function ResizeEdge({ side, pane, size, setPane }: {
 
 function WorkspacePanel({ onOpen }: { onOpen: (label: string) => void }) {
   const [query, setQuery] = useState('');
+  const toolsHeading = useId();
+  const suggestedHeading = useId();
   return (
     <div className={styles.panel}>
       <label className={styles.address}>
@@ -102,8 +111,8 @@ function WorkspacePanel({ onOpen }: { onOpen: (label: string) => void }) {
           aria-label="Search or enter URL"
         />
       </label>
-      <section className={styles.section} aria-label="Tools">
-        <h3 className={styles.label}>Tools</h3>
+      <section className={styles.section} aria-labelledby={toolsHeading}>
+        <h3 id={toolsHeading} className={styles.label}>Tools</h3>
         <div className={styles.list}>
           {tools.map((tool) => (
             <div key={tool.id} className={styles.row}>
@@ -119,8 +128,8 @@ function WorkspacePanel({ onOpen }: { onOpen: (label: string) => void }) {
           ))}
         </div>
       </section>
-      <section className={styles.section} aria-label="Suggested">
-        <h3 className={styles.label}>Suggested</h3>
+      <section className={styles.section} aria-labelledby={suggestedHeading}>
+        <h3 id={suggestedHeading} className={styles.label}>Suggested</h3>
         <div className={styles.list}>
           {sources.map((item) => (
             <button key={item.id} type="button" className={`${styles.row} ${styles.open} ${styles.source}`} onClick={() => onOpen(item.title)}>
@@ -199,7 +208,7 @@ export default function AppShellWorkspaceExperiment() {
           variant="ghost"
           size="icon"
           aria-label={sidebar.collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          aria-controls="lab-sidebar"
+          aria-controls={paneId('sidebar')}
           aria-expanded={!sidebar.collapsed}
           onClick={() => setSidebar((current) => ({ ...current, collapsed: !current.collapsed }))}
         >
@@ -213,7 +222,7 @@ export default function AppShellWorkspaceExperiment() {
             variant="ghost"
             size="icon"
             aria-label={workspace.collapsed ? 'Expand workspace' : 'Collapse workspace'}
-            aria-controls="lab-workspace"
+            aria-controls={paneId('workspace')}
             aria-expanded={!workspace.collapsed}
             onClick={() => setWorkspace((current) => ({ ...current, collapsed: !current.collapsed }))}
           >
@@ -224,7 +233,7 @@ export default function AppShellWorkspaceExperiment() {
       <div className={styles.body}>
         <aside
           ref={sidebarElement}
-          id="lab-sidebar"
+          id={paneId('sidebar')}
           aria-label="Sidebar"
           className={`${styles.sidebar} ${sidebar.collapsed ? styles.sidebarCollapsed : ''}`}
         >
@@ -309,7 +318,7 @@ export default function AppShellWorkspaceExperiment() {
               </Button>
             </div>
           </form>
-          <p className={styles.notice} role="status">{notice || 'Your ideas, with a little space to grow.'}</p>
+          <p className={styles.notice} role="status">{notice}</p>
         </section>
         <button
           type="button"
@@ -320,7 +329,7 @@ export default function AppShellWorkspaceExperiment() {
         />
         <aside
           ref={workspaceElement}
-          id="lab-workspace"
+          id={paneId('workspace')}
           aria-label="Workspace"
           className={`${styles.workspace} ${workspace.collapsed ? styles.workspaceCollapsed : ''}`}
           onKeyDown={(event) => {

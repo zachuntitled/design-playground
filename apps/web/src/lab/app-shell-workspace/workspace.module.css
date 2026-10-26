@@ -243,7 +243,7 @@
   outline-offset: -1px;
 }
 
-.body:has(.resizeEdge:active) .sidebar, .body:has(.resizeEdge:active) .workspace {
+.body:has(.resizeEdge:is(:active, :focus)) :is(.sidebar, .workspace) {
   overflow: hidden;
   transition: none;
 }
@@ -737,7 +737,7 @@
     padding: 0;
     border-radius: 0;
     border: 0;
-    background: var(--bg-fill);
+    background: color-mix(in srgb, var(--text-strong) 12%, transparent);
     opacity: 1;
     transition: opacity 200ms var(--workspace-ease), visibility 200ms;
   }
