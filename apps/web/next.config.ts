@@ -196,6 +196,8 @@ export function cmsHostReleaseFingerprint(
 }
 
 const nextConfig: NextConfig = {
+  // Exclude lab route files from production route discovery, including static exports.
+  pageExtensions: !isProd ? ['dev.tsx', 'tsx', 'ts', 'jsx', 'js'] : ['tsx', 'ts', 'jsx', 'js'],
   env: {
     // Embedded in the client at build time. Packaged servers use the already
     // compiled client and need not retain source files to load this config.

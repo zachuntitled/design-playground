@@ -1,0 +1,64 @@
+.sample {
+  display: grid;
+  gap: var(--spacing-24);
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.section {
+  padding: var(--spacing-24);
+  border: var(--stroke-thin) solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+}
+
+.section h2 {
+  margin: 0 0 var(--spacing-16);
+  color: var(--text-strong);
+  font-size: var(--font-size-20);
+}
+
+.buttonRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-12);
+  margin-top: var(--spacing-12);
+}
+
+.variant {
+  width: 120px;
+  font-size: var(--font-size-13);
+}
+
+.fields {
+  display: grid;
+  gap: var(--spacing-16);
+  max-width: 480px;
+}
+
+.field {
+  display: grid;
+  gap: var(--spacing-8);
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--spacing-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.swatches code {
+  font-family: var(--mono);
+  font-size: var(--font-size-12);
+}
+
+.swatch {
+  height: 56px;
+  margin-bottom: var(--spacing-8);
+  border: var(--stroke-thin) solid var(--border);
+  border-radius: var(--radius-sm);
+}

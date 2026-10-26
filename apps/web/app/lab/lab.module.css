@@ -1,0 +1,69 @@
+.page {
+  width: 100%;
+  height: 100dvh;
+  overflow: auto;
+  padding: var(--spacing-32);
+  background: var(--bg-app);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.header,
+.list {
+  max-width: 960px;
+  margin: 0 auto var(--spacing-32);
+}
+
+.header h1 {
+  margin: var(--spacing-12) 0;
+  color: var(--text-strong);
+  font-size: var(--font-size-32);
+}
+
+.header p,
+.card p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.eyebrow {
+  font-size: var(--font-size-12);
+}
+
+.list {
+  display: grid;
+  gap: var(--spacing-16);
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: block;
+  padding: var(--spacing-24);
+  border: var(--stroke-thin) solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+  color: var(--text-strong);
+  text-decoration: none;
+}
+
+.card:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-subtle);
+}
+
+.card h2 {
+  margin: 0 0 var(--spacing-8);
+  font-size: var(--font-size-20);
+}
+
+.back {
+  color: var(--text);
+  text-underline-offset: var(--spacing-4);
+}
+
+.card:focus-visible,
+.back:focus-visible {
+  outline: var(--stroke-thick) solid var(--selected);
+  outline-offset: var(--spacing-4);
+}
