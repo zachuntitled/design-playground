@@ -14,9 +14,15 @@ beforeEach(() => {
     observe() {}
     disconnect() {}
   });
+  const computedStyle = window.getComputedStyle;
+  vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
+    const style = computedStyle(element);
+    Object.defineProperties(style, { borderLeftWidth: { value: '0px' }, borderRightWidth: { value: '0px' } });
+    return style;
+  });
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => containerWidth);
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => ({
-    width: containerWidth + 2, height: 620, x: 0, y: 0, top: 0, left: 0, right: containerWidth + 2, bottom: 620, toJSON() {},
+    width: containerWidth, height: 620, x: 0, y: 0, top: 0, left: 0, right: containerWidth, bottom: 620, toJSON() {},
   }));
 });
 
@@ -154,7 +160,7 @@ describe('lab app shell interactions', () => {
     containerWidth = 760;
     render(<AppShellWorkspaceExperiment />);
     openWorkspace();
-    fireEvent.click(screen.getByRole('button', { name: /Terminal ⌃/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Terminal/ }));
     const status = screen.getByRole('status');
     expect(status.textContent).toContain('Terminal selected');
     expect(status.closest('[inert]')).toBeNull();

@@ -1,12 +1,12 @@
 'use client';
 
 import {
-  useId, useLayoutEffect, useRef, useState, type CSSProperties, type Dispatch, type PointerEvent, type SetStateAction,
+  useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent,
 } from 'react';
 import { Button, Textarea } from '@open-design/components';
 import { Icon, type IconName } from '../../components/Icon';
 import {
-  DRAWER_BREAKPOINT, PANE_SIZES, clampWidth, fitPanes, maxWidth, resetWidth, resizeWidth, widthForKey,
+  COLLAPSED_WIDTHS, FRAME_GAP, PANE_SIZES, fitPanes, shellMode, resizeWidth, widthForKey,
   type PaneSide, type PaneSize, type PaneState,
 } from './pane-size';
 import styles from './workspace.module.css';
@@ -32,11 +32,11 @@ function paneId(side: PaneSide) {
   return `lab-${side}`;
 }
 
-function ResizeEdge({ side, pane, size, setPane }: {
+function ResizeEdge({ side, pane, size, onResize }: {
   side: PaneSide;
   pane: PaneState;
   size: PaneSize;
-  setPane: Dispatch<SetStateAction<PaneState>>;
+  onResize: (width: number) => void;
 }) {
   const drag = useRef<{ pointerId: number; x: number; width: number } | null>(null);
   const edge = useRef<HTMLDivElement>(null);
@@ -73,9 +73,9 @@ function ResizeEdge({ side, pane, size, setPane }: {
         const width = widthForKey(pane.width, event.key, event.shiftKey, side, size);
         if (width === undefined) return;
         event.preventDefault();
-        setPane((current) => ({ ...current, width }));
+        onResize(width);
       }}
-      onDoubleClick={() => setPane((current) => ({ ...current, width: clampWidth(resetWidth(side), size) }))}
+      onDoubleClick={() => onResize(size.default)}
       onPointerDown={(event) => {
         if (pane.collapsed || event.button !== 0 || !event.isPrimary) return;
         event.preventDefault();
@@ -87,7 +87,7 @@ function ResizeEdge({ side, pane, size, setPane }: {
         const start = drag.current;
         if (pane.collapsed || !start || start.pointerId !== event.pointerId) return;
         const width = resizeWidth(start.width, event.clientX - start.x, side, size);
-        setPane((current) => ({ ...current, width }));
+        onResize(width);
       }}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
@@ -148,27 +148,31 @@ function WorkspacePanel({ onOpen }: { onOpen: (label: string) => void }) {
 }
 
 export default function AppShellWorkspaceExperiment() {
-  const [sidebar, setSidebar] = useState<PaneState>({ width: resetWidth('sidebar'), collapsed: false });
-  const [workspace, setWorkspace] = useState<PaneState>({ width: resetWidth('workspace'), collapsed: false });
+  const [sidebar, setSidebar] = useState<PaneState>({ width: PANE_SIZES.sidebar.default, collapsed: false });
+  const [workspace, setWorkspace] = useState<PaneState>({ width: PANE_SIZES.workspace.default, collapsed: false });
   const [active, setActive] = useState('Website refresh');
   const [notice, setNotice] = useState('');
-  const workspaceToggle = useRef<HTMLButtonElement>(null);
   const drawerClose = useRef<HTMLButtonElement>(null);
+  const sidebarClose = useRef<HTMLButtonElement>(null);
+  const overlayFocus = useRef<{ side: PaneSide; element: HTMLElement; pending: boolean } | null>(null);
   const shell = useRef<HTMLElement>(null);
   const sidebarElement = useRef<HTMLElement>(null);
   const workspaceElement = useRef<HTMLElement>(null);
   const pageElement = useRef<HTMLElement>(null);
   const [containerWidth, setContainerWidth] = useState(1440);
-  const narrow = containerWidth <= DRAWER_BREAKPOINT;
-  const drawerOpen = narrow && !workspace.collapsed;
-  const widths = fitPanes(containerWidth, sidebar, workspace);
-  const sidebarSize = { ...PANE_SIZES.sidebar, max: maxWidth('sidebar', containerWidth, workspace.collapsed ? 8 : widths.workspace) };
-  const workspaceSize = { ...PANE_SIZES.workspace, max: maxWidth('workspace', containerWidth, sidebar.collapsed ? 0 : widths.sidebar) };
+  const mode = shellMode(containerWidth);
+  const narrow = mode !== 'docked';
+  const overlay = narrow && !workspace.collapsed ? 'workspace'
+    : mode === 'compact' && !sidebar.collapsed ? 'sidebar' : null;
+  const fitted = fitPanes(containerWidth, mode, sidebar, workspace);
 
   useLayoutEffect(() => {
     const element = shell.current;
     if (!element) return;
-    const measure = () => setContainerWidth(element.clientWidth);
+    const measure = () => {
+      const style = getComputedStyle(element);
+      setContainerWidth(element.getBoundingClientRect().width - parseFloat(style.borderLeftWidth || '0') - parseFloat(style.borderRightWidth || '0'));
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
@@ -176,18 +180,65 @@ export default function AppShellWorkspaceExperiment() {
   }, []);
 
   useLayoutEffect(() => {
-    sidebarElement.current?.toggleAttribute('inert', sidebar.collapsed || drawerOpen);
-    workspaceElement.current?.toggleAttribute('inert', workspace.collapsed);
-    pageElement.current?.toggleAttribute('inert', drawerOpen);
-  }, [sidebar.collapsed, workspace.collapsed, drawerOpen]);
+    if (mode !== 'docked') setWorkspace((current) => ({ ...current, collapsed: true }));
+    if (mode === 'compact') setSidebar((current) => ({ ...current, collapsed: true }));
+  }, [mode]);
 
   useLayoutEffect(() => {
-    if (drawerOpen) drawerClose.current?.focus();
-  }, [drawerOpen]);
+    sidebarElement.current?.toggleAttribute('inert', sidebar.collapsed || overlay === 'workspace');
+    workspaceElement.current?.toggleAttribute('inert', workspace.collapsed || overlay === 'sidebar');
+    pageElement.current?.toggleAttribute('inert', overlay !== null);
+    const focus = overlayFocus.current;
+    if (!focus) return;
+    if (focus.side !== overlay) {
+      focus.element.focus();
+      overlayFocus.current = null;
+    } else if (focus.pending) {
+      (overlay === 'workspace' ? drawerClose : sidebarClose).current?.focus();
+      focus.pending = false;
+    }
+  }, [sidebar.collapsed, workspace.collapsed, overlay]);
 
-  function closeWorkspace() {
-    setWorkspace((current) => ({ ...current, collapsed: true }));
-    workspaceToggle.current?.focus();
+  function togglePane(side: PaneSide) {
+    const pane = side === 'sidebar' ? sidebar : workspace;
+    if (pane.collapsed && (side === 'workspace' ? narrow : mode === 'compact')) {
+      overlayFocus.current = { side, element: document.activeElement as HTMLElement, pending: true };
+      if (side === 'workspace' && mode === 'compact') setSidebar((current) => ({ ...current, collapsed: true }));
+      if (side === 'sidebar') setWorkspace((current) => ({ ...current, collapsed: true }));
+    }
+    (side === 'sidebar' ? setSidebar : setWorkspace)((current) => ({ ...current, collapsed: !current.collapsed }));
+  }
+
+  function closeOverlay() {
+    if (overlay) (overlay === 'sidebar' ? setSidebar : setWorkspace)((current) => ({ ...current, collapsed: true }));
+  }
+
+  function resizePane(side: PaneSide, width: number) {
+    setSidebar((current) => ({ ...current, width: side === 'sidebar' ? width : fitted.sidebar.width }));
+    setWorkspace((current) => ({ ...current, width: side === 'workspace' ? width : fitted.workspace.width }));
+  }
+
+  function trapFocus(event: KeyboardEvent<HTMLElement>) {
+    if (event.key !== 'Tab') return;
+    const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
+      'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"]), [contenteditable]',
+    )).filter((element) => {
+      if (element.matches(':disabled, [tabindex="-1"], input[type="hidden"], [contenteditable="false"]') || element.closest('[hidden], [inert]')) return false;
+      for (let ancestor: HTMLElement | null = element; ancestor; ancestor = ancestor.parentElement) {
+        const style = getComputedStyle(ancestor);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+      }
+      return true;
+    });
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first?.focus();
+    }
   }
 
   return (
@@ -195,11 +246,16 @@ export default function AppShellWorkspaceExperiment() {
       ref={shell}
       className={styles.shell}
       aria-label="App shell workspace experiment"
-      style={{ '--sidebar-width': `${widths.sidebar}px`, '--workspace-width': `${widths.workspace}px` } as CSSProperties}
+      data-mode={mode}
+      style={{
+        '--sidebar-width': `${fitted.sidebar.width}px`, '--workspace-width': `${fitted.workspace.width}px`,
+        '--sidebar-collapsed-width': `${COLLAPSED_WIDTHS.sidebar}px`, '--workspace-collapsed-width': `${COLLAPSED_WIDTHS.workspace}px`,
+        '--frame-gap': `${FRAME_GAP}px`,
+      } as CSSProperties}
       onKeyDown={(event) => {
-        if (event.key === 'Escape' && drawerOpen) {
+        if (event.key === 'Escape' && overlay) {
           event.preventDefault();
-          closeWorkspace();
+          closeOverlay();
         }
       }}
     >
@@ -210,7 +266,7 @@ export default function AppShellWorkspaceExperiment() {
           aria-label={sidebar.collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-controls={paneId('sidebar')}
           aria-expanded={!sidebar.collapsed}
-          onClick={() => setSidebar((current) => ({ ...current, collapsed: !current.collapsed }))}
+          onClick={() => togglePane('sidebar')}
         >
           <Icon name="panel-left" size={18} aria-hidden="true" />
         </Button>
@@ -218,13 +274,12 @@ export default function AppShellWorkspaceExperiment() {
         <div className={styles.toolbarEnd}>
           <span className={styles.workspaceTitle}>Workspace</span>
           <Button
-            ref={workspaceToggle}
             variant="ghost"
             size="icon"
             aria-label={workspace.collapsed ? 'Expand workspace' : 'Collapse workspace'}
             aria-controls={paneId('workspace')}
             aria-expanded={!workspace.collapsed}
-            onClick={() => setWorkspace((current) => ({ ...current, collapsed: !current.collapsed }))}
+            onClick={() => togglePane('workspace')}
           >
             <Icon name="layout-right" size={18} aria-hidden="true" />
           </Button>
@@ -235,9 +290,18 @@ export default function AppShellWorkspaceExperiment() {
           ref={sidebarElement}
           id={paneId('sidebar')}
           aria-label="Sidebar"
+          role={mode === 'compact' ? 'dialog' : undefined}
+          aria-modal={overlay === 'sidebar' ? true : undefined}
+          onKeyDown={overlay === 'sidebar' ? trapFocus : undefined}
           className={`${styles.sidebar} ${sidebar.collapsed ? styles.sidebarCollapsed : ''}`}
         >
           <div className={styles.sidebarInner}>
+            <div className={styles.sidebarDrawerHeader}>
+              <h2>Sidebar</h2>
+              <Button ref={sidebarClose} variant="ghost" size="icon" aria-label="Close sidebar" onClick={closeOverlay}>
+                <Icon name="close" size={18} aria-hidden="true" />
+              </Button>
+            </div>
             <div className={styles.identity}>
               <span className={styles.logo}>O</span><strong>OpenDesign</strong>
               <Icon name="chevron-down" aria-hidden="true" />
@@ -271,7 +335,7 @@ export default function AppShellWorkspaceExperiment() {
               <Icon name="chevron-down" aria-hidden="true" />
             </div>
           </div>
-          {!narrow && <ResizeEdge side="sidebar" pane={{ ...sidebar, width: widths.sidebar }} size={sidebarSize} setPane={setSidebar} />}
+          {!narrow && <ResizeEdge side="sidebar" pane={{ ...sidebar, width: fitted.sidebar.width }} size={fitted.sidebar.size} onResize={(width) => resizePane('sidebar', width)} />}
         </aside>
         <section ref={pageElement} className={styles.page} aria-label="Conversation">
           <div className={styles.pageHeader}>
@@ -318,39 +382,28 @@ export default function AppShellWorkspaceExperiment() {
               </Button>
             </div>
           </form>
-          <p className={styles.notice} role="status">{notice}</p>
         </section>
         <button
           type="button"
-          aria-label="Close workspace drawer"
+          aria-label={`Close ${overlay ?? 'workspace'} drawer`}
           tabIndex={-1}
-          className={`${styles.scrim} ${workspace.collapsed ? styles.scrimHidden : ''}`}
-          onClick={closeWorkspace}
+          className={`${styles.scrim} ${overlay ? '' : styles.scrimHidden}`}
+          onClick={closeOverlay}
         />
         <aside
           ref={workspaceElement}
           id={paneId('workspace')}
           aria-label="Workspace"
           className={`${styles.workspace} ${workspace.collapsed ? styles.workspaceCollapsed : ''}`}
-          onKeyDown={(event) => {
-            if (!drawerOpen || event.key !== 'Tab') return;
-            const controls = event.currentTarget.querySelectorAll<HTMLElement>('button, input');
-            const first = controls[0];
-            const last = controls[controls.length - 1];
-            if (event.shiftKey && document.activeElement === first) {
-              event.preventDefault();
-              last?.focus();
-            } else if (!event.shiftKey && document.activeElement === last) {
-              event.preventDefault();
-              first?.focus();
-            }
-          }}
+          role={narrow ? 'dialog' : undefined}
+          aria-modal={overlay === 'workspace' ? true : undefined}
+          onKeyDown={overlay === 'workspace' ? trapFocus : undefined}
         >
-          {!narrow && <ResizeEdge side="workspace" pane={{ ...workspace, width: widths.workspace }} size={workspaceSize} setPane={setWorkspace} />}
+          {!narrow && <ResizeEdge side="workspace" pane={{ ...workspace, width: fitted.workspace.width }} size={fitted.workspace.size} onResize={(width) => resizePane('workspace', width)} />}
           <div className={styles.workspaceInner}>
             <div className={styles.drawerHeader}>
               <h2>Workspace</h2>
-              <Button ref={drawerClose} variant="ghost" size="icon" aria-label="Close workspace" onClick={closeWorkspace}>
+              <Button ref={drawerClose} variant="ghost" size="icon" aria-label="Close workspace" onClick={closeOverlay}>
                 <Icon name="close" size={18} aria-hidden="true" />
               </Button>
             </div>
@@ -359,6 +412,7 @@ export default function AppShellWorkspaceExperiment() {
           </div>
         </aside>
       </div>
+      <p className={styles.notice} role="status">{notice}</p>
     </section>
   );
 }

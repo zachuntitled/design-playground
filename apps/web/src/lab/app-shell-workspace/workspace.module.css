@@ -1,10 +1,9 @@
 /* affectUI → OpenDesign: card → bg-panel; line/strong/soft → border/strong/soft;
-   shadow → shadow-xs; ink → text-strong; text → text; muted/placeholder → text-muted; faint → text-soft;
+   shadow → shadow-xs; ink → text-strong; text → text; muted/placeholder/readable faint → text-muted; decorative faint → text-soft;
    hover → bg-subtle; chip → bg-muted; accent-soft → accent-soft; page → bg-app.
    ease → local cubic-bezier(0.23, 1, 0.32, 1), since --ease-out uses a different curve. */
 
 .shell {
-  container: workspace-shell / inline-size;
   --workspace-ease: cubic-bezier(0.23, 1, 0.32, 1);
   position: relative;
   display: flex;
@@ -80,7 +79,6 @@
 }
 
 .sidebar {
-  overflow: hidden;
   position: relative;
   width: var(--sidebar-width);
   flex: none;
@@ -88,7 +86,7 @@
 }
 
 .sidebarInner {
-  width: var(--sidebar-width);
+  width: 100%;
   height: 100%;
   padding: 10px 8px 8px 10px;
   display: flex;
@@ -97,7 +95,7 @@
 }
 
 .sidebarCollapsed {
-  width: 0;
+  width: var(--sidebar-collapsed-width);
   opacity: 0;
   pointer-events: none;
   transition-duration: 140ms;
@@ -213,10 +211,10 @@
 .resizeEdge {
   position: absolute;
   z-index: 4;
-  top: 0;
+  top: 2px;
+  bottom: 2px;
   right: -4px;
   width: 8px;
-  height: 100%;
   cursor: col-resize;
   touch-action: none;
   user-select: none;
@@ -257,7 +255,7 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  margin: 0 0 8px;
+  margin: 0 0 var(--frame-gap);
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--bg-panel);
@@ -266,7 +264,7 @@
 }
 
 .sidebarCollapsed + .page {
-  margin-left: 8px;
+  margin-left: var(--frame-gap);
 }
 
 .pageHeader {
@@ -364,7 +362,7 @@
 }
 
 .message time {
-  margin-left: 8px;
+  margin-left: var(--frame-gap);
   color: var(--text-soft);
   font-size: 10px;
   font-weight: 400;
@@ -448,7 +446,6 @@
 }
 
 .workspace {
-  overflow: hidden;
   position: relative;
   flex: none;
   width: var(--workspace-width);
@@ -456,27 +453,27 @@
 }
 
 .workspaceInner {
-  width: var(--workspace-width);
+  width: 100%;
   height: 100%;
   padding: 10px 10px 10px 8px;
   overflow: auto;
 }
 
 .workspaceCollapsed {
-  width: 8px;
+  width: var(--workspace-collapsed-width);
   opacity: 0;
   pointer-events: none;
   transform: translateX(16px);
   transition-duration: 140ms;
 }
 
-.drawerHeader {
+.drawerHeader, .sidebarDrawerHeader {
   display: none;
 }
 
 .panelHint {
   margin: 32px 4px 0;
-  color: var(--text-soft);
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 1.6;
 }
@@ -690,107 +687,94 @@
   translate: 0 0;
 }
 
-@container workspace-shell (max-width: 900px) {
-  .workspace {
-    position: absolute;
-    z-index: 6;
-    top: 0;
-    bottom: 0;
-    right: 0;
-    width: min(360px, calc(100% - 56px));
-    background: var(--bg-app);
-    border-left: 1px solid var(--border);
-    box-shadow: var(--shadow-lg);
-    transform: translateX(0);
-  }
-
-  .workspaceInner {
-    width: 100%;
-  }
-
-  .workspaceCollapsed {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-
-  .drawerHeader {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin: -4px 0 16px;
-  }
-
-  .drawerHeader h2 {
-    margin: 0;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text-strong);
-  }
-
-  .scrim {
-    display: block;
-    position: absolute;
-    z-index: 5;
-    inset: 0;
-    width: auto;
-    height: auto;
-    padding: 0;
-    border-radius: 0;
-    border: 0;
-    background: color-mix(in srgb, var(--text-strong) 12%, transparent);
-    opacity: 1;
-    transition: opacity 200ms var(--workspace-ease), visibility 200ms;
-  }
-
-  .scrimHidden {
-    visibility: hidden;
-    opacity: 0;
-    pointer-events: none;
-    transition-duration: 140ms;
-  }
-
-  .page, .sidebarCollapsed + .page {
-    margin: 0 8px 8px;
-  }
-
-  .conversation {
-    padding: 24px 18px 16px;
-  }
-
-  .composer {
-    margin-left: 16px;
-    margin-right: 16px;
-  }
+.shell:not([data-mode="docked"]) .workspace {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: var(--workspace-width);
+  background: var(--bg-app);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(0);
 }
 
-@container workspace-shell (max-width: 600px) {
-  .sidebar {
-    position: absolute;
-    z-index: 4;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    background: var(--bg-app);
-    box-shadow: var(--shadow-md);
-    max-width: calc(100% - 48px);
-  }
+.shell:not([data-mode="docked"]) .workspaceCollapsed {
+  transform: translateX(100%);
+  opacity: 0;
+}
 
-  .sidebarInner {
-    width: 100%;
-  }
+.shell:not([data-mode="docked"]) .drawerHeader, .shell[data-mode="compact"] .sidebarDrawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -4px 0 16px;
+}
 
-  .page, .sidebarCollapsed + .page {
-    margin: 0 6px 6px;
-    border-radius: 11px;
-  }
+.shell:not([data-mode="docked"]) .drawerHeader h2, .sidebarDrawerHeader h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-strong);
+}
 
-  .breadcrumb {
-    font-size: 12px;
-  }
+.shell:not([data-mode="docked"]) .scrim {
+  display: block;
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  width: auto;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  border: 0;
+  background: color-mix(in srgb, var(--text-strong) 12%, transparent);
+  opacity: 1;
+  transition: opacity 200ms var(--workspace-ease), visibility 200ms;
+}
 
-  .workspaceTitle {
-    display: none;
-  }
+.shell:not([data-mode="docked"]) .scrimHidden {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition-duration: 140ms;
+}
+
+.shell:not([data-mode="docked"]) .page, .shell:not([data-mode="docked"]) .sidebarCollapsed + .page {
+  margin: 0 var(--frame-gap) var(--frame-gap);
+}
+
+.shell:not([data-mode="docked"]) .conversation {
+  padding: 24px 18px 16px;
+}
+
+.shell:not([data-mode="docked"]) .composer {
+  margin-left: 16px;
+  margin-right: 16px;
+}
+
+.shell[data-mode="compact"] .sidebar {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: var(--bg-app);
+  box-shadow: var(--shadow-md);
+}
+
+.shell[data-mode="compact"] .page, .shell[data-mode="compact"] .sidebarCollapsed + .page {
+  margin: 0 6px 6px;
+  border-radius: 11px;
+}
+
+.shell[data-mode="compact"] .breadcrumb {
+  font-size: 12px;
+}
+
+.shell[data-mode="compact"] .workspaceTitle {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

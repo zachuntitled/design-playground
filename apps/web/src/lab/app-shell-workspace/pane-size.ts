@@ -35,26 +35,41 @@ export function widthForKey(width: number, key: string, shift: boolean, side: Pa
   return resizeWidth(width, action.delta * KEY_STEPS[shift ? 'shift' : 'normal'], side, size);
 }
 
-export function resetWidth(side: PaneSide): number {
-  return clampWidth(PANE_SIZES[side].default, PANE_SIZES[side]);
+type ShellMode = 'docked' | 'drawer' | 'compact';
+
+const DRAWER_BREAKPOINT = 900;
+const COMPACT_BREAKPOINT = 600;
+const MIN_PAGE_WIDTH = 320;
+export const FRAME_GAP = 8;
+export const COLLAPSED_WIDTHS = { sidebar: 0, workspace: FRAME_GAP } as const;
+
+export function shellMode(containerWidth: number): ShellMode {
+  if (containerWidth <= COMPACT_BREAKPOINT) return 'compact';
+  return containerWidth <= DRAWER_BREAKPOINT ? 'drawer' : 'docked';
 }
 
-export const DRAWER_BREAKPOINT = 900;
-export const MIN_PAGE_WIDTH = 320;
-const FRAME_GAP = 8;
-
-export function maxWidth(side: PaneSide, containerWidth: number, otherWidth: number): number {
-  return Math.min(PANE_SIZES[side].max, Math.max(PANE_SIZES[side].min, containerWidth - otherWidth - MIN_PAGE_WIDTH - FRAME_GAP));
+function effectiveSize(side: PaneSide, available: number): PaneSize {
+  const max = Math.min(PANE_SIZES[side].max, available);
+  const min = Math.min(PANE_SIZES[side].min, max);
+  return { min, max, default: Math.min(max, Math.max(min, PANE_SIZES[side].default)) };
 }
 
-export function fitPanes(containerWidth: number, sidebar: PaneState, workspace: PaneState) {
-  const sidebarWidth = clampWidth(sidebar.width, {
-    ...PANE_SIZES.sidebar,
-    max: maxWidth('sidebar', containerWidth, workspace.collapsed ? FRAME_GAP : PANE_SIZES.workspace.min),
-  });
-  const workspaceWidth = clampWidth(workspace.width, {
-    ...PANE_SIZES.workspace,
-    max: maxWidth('workspace', containerWidth, sidebar.collapsed ? 0 : sidebarWidth),
-  });
-  return { sidebar: sidebarWidth, workspace: workspaceWidth };
+export function fitPanes(containerWidth: number, mode: ShellMode, sidebar: PaneState, workspace: PaneState) {
+  const budget = Math.max(0, containerWidth - MIN_PAGE_WIDTH - FRAME_GAP);
+  const sidebarSpace = mode === 'compact' ? containerWidth - 48 : budget - (
+    mode !== 'docked' || workspace.collapsed ? COLLAPSED_WIDTHS.workspace : PANE_SIZES.workspace.min
+  );
+  const sidebarWidth = clampWidth(sidebar.width, effectiveSize('sidebar', Math.max(0, sidebarSpace)));
+  const workspaceSpace = mode !== 'docked' ? Math.min(PANE_SIZES.workspace.default, containerWidth - 56) : budget - (
+    sidebar.collapsed ? COLLAPSED_WIDTHS.sidebar : sidebarWidth
+  );
+  const workspaceSize = effectiveSize('workspace', Math.max(0, workspaceSpace));
+  const workspaceWidth = clampWidth(workspace.width, workspaceSize);
+  const sidebarSize = effectiveSize('sidebar', Math.max(0, mode === 'docked' ? budget - (
+    workspace.collapsed ? COLLAPSED_WIDTHS.workspace : workspaceWidth
+  ) : sidebarSpace));
+  return {
+    sidebar: { width: sidebarWidth, size: sidebarSize },
+    workspace: { width: workspaceWidth, size: workspaceSize },
+  };
 }
