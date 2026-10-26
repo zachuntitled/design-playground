@@ -729,7 +729,7 @@
   padding: 0;
   border-radius: 0;
   border: 0;
-  background: color-mix(in srgb, var(--text-strong) 12%, transparent);
+  background: rgb(0 0 0 / 0.32);
   opacity: 1;
   transition: opacity 200ms var(--workspace-ease), visibility 200ms;
 }
