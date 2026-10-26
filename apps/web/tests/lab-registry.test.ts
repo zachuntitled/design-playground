@@ -11,6 +11,14 @@ describe('lab registry', () => {
     expect(new Set(labExperiments.map((entry) => entry.slug))).toEqual(new Set(directories));
   });
 
+  it('loads each experiment from its own directory', async () => {
+    for (const entry of labExperiments) {
+      const { default: fromRegistry } = await entry.load();
+      const { default: fromDirectory } = await import(`../src/lab/${entry.slug}/index.tsx`);
+      expect(fromRegistry, entry.slug).toBe(fromDirectory);
+    }
+  });
+
   it('uses unique slugs', () => {
     const slugs = labExperiments.map((entry) => entry.slug);
     expect(new Set(slugs).size).toBe(slugs.length);
