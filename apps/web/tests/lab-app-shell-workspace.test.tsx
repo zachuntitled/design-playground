@@ -229,7 +229,7 @@ describe('lab app shell interactions', () => {
   ])('returns focus before auto-folding the $side', ({ from, to, side, role, name }) => {
     containerWidth = from;
     render(<AppShellWorkspaceExperiment />);
-    screen.getByRole(role, { name, exact: true }).focus();
+    screen.getByRole(role, { name }).focus();
     resizeContainer(to);
     expect(document.activeElement).toBe(screen.getByRole('button', { name: `Expand ${side}` }));
     expect(document.activeElement?.closest('[inert]')).toBeNull();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  clampWidth, fitPanes, PANE_SIZES, resizeWidth, shellMode, widthForKey,
+  clampWidth, fitPanes, PANE_SIZES, resizeWidth, shellMode, widthForKey, type PaneState,
 } from '../src/lab/app-shell-workspace/pane-size';
 
 describe('lab app shell pane sizes', () => {
@@ -37,12 +37,11 @@ describe('lab app shell pane sizes', () => {
     expect(panes.workspace.size.default).toBe(280);
   });
 
-  it('restores the sidebar after shrinking with the other rendered pane held fixed', () => {
-    let sidebar = { width: 272, collapsed: false };
-    let workspace = { width: 360, collapsed: false };
+  it('restores the sidebar after shrinking without changing the other pane preference', () => {
+    let sidebar: PaneState = { width: 272, collapsed: false };
+    const workspace: PaneState = { width: 360, collapsed: false };
     let panes = fitPanes(918, 'docked', sidebar, workspace);
     expect(panes.workspace.width).toBe(318);
-    workspace = { ...workspace, width: panes.workspace.width };
     sidebar = { ...sidebar, width: widthForKey(panes.sidebar.width, 'ArrowLeft', false, 'sidebar', panes.sidebar.size)! };
     panes = fitPanes(918, 'docked', sidebar, workspace);
     expect(panes.sidebar.width).toBe(256);
@@ -54,9 +53,9 @@ describe('lab app shell pane sizes', () => {
   });
 
   it('reclaims folded space and does not shrink the docked sidebar when its drawer opens', () => {
-    expect(fitPanes(918, 'docked', { width: 380, collapsed: true }, { width: 560, collapsed: false }).workspace.width).toBe(560);
-    expect(fitPanes(918, 'docked', { width: 380, collapsed: false }, { width: 560, collapsed: true }).sidebar.width).toBe(380);
-    for (const collapsed of [false, true]) {
+    expect(fitPanes(918, 'docked', { width: 380, collapsed: 'user' }, { width: 560, collapsed: false }).workspace.width).toBe(560);
+    expect(fitPanes(918, 'docked', { width: 380, collapsed: false }, { width: 560, collapsed: 'user' }).sidebar.width).toBe(380);
+    for (const collapsed of [false, 'auto'] as const) {
       expect(fitPanes(760, 'drawer', { width: 272, collapsed: false }, { width: 360, collapsed }).sidebar.width).toBe(272);
     }
   });
@@ -67,4 +66,13 @@ describe('lab app shell pane sizes', () => {
     expect(shellMode(600.4)).toBe('drawer');
     expect(shellMode(600)).toBe('compact');
   });
+  it('keeps the untouched sidebar stable while resizing the workspace', () => {
+    const sidebar: PaneState = { width: 272, collapsed: false };
+    for (const width of [318, 302, 318]) {
+      const fitted = fitPanes(918, 'docked', sidebar, { width, collapsed: false }, 'workspace');
+      expect(fitted.sidebar.width).toBe(272);
+      expect(fitted.workspace.width).toBe(width);
+    }
+  });
+
 });

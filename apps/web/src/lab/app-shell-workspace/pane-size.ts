@@ -1,5 +1,5 @@
 export type PaneSize = Readonly<{ default: number; min: number; max: number }>;
-export type PaneState = Readonly<{ width: number; collapsed: boolean }>;
+export type PaneState = Readonly<{ width: number; collapsed: false | 'user' | 'auto' }>;
 export type PaneSide = 'sidebar' | 'workspace';
 
 export const PANE_SIZES: Readonly<Record<PaneSide, PaneSize>> = {
@@ -58,22 +58,37 @@ function effectiveSize(side: PaneSide, available: number): PaneSize {
   return { min, max, default: Math.min(max, Math.max(min, PANE_SIZES[side].default)) };
 }
 
-export function fitPanes(containerWidth: number, mode: ShellMode, sidebar: PaneState, workspace: PaneState) {
+export function fitPanes(containerWidth: number, mode: ShellMode, sidebar: PaneState, workspace: PaneState, priority: PaneSide = 'sidebar') {
   const budget = Math.max(0, containerWidth - MIN_PAGE_WIDTH - FRAME_GAP);
-  const sidebarSpace = mode === 'compact' ? containerWidth - SIDEBAR_OVERLAY_CLEARANCE : budget - (
-    mode !== 'docked' || workspace.collapsed ? COLLAPSED_WIDTHS.workspace : PANE_SIZES.workspace.min
-  );
-  const sidebarWidth = clampWidth(sidebar.width, effectiveSize('sidebar', Math.max(0, sidebarSpace)));
-  const workspaceSpace = mode !== 'docked' ? Math.min(PANE_SIZES.workspace.default, containerWidth - WORKSPACE_OVERLAY_CLEARANCE) : budget - (
-    sidebar.collapsed ? COLLAPSED_WIDTHS.sidebar : sidebarWidth
-  );
-  const workspaceSize = effectiveSize('workspace', Math.max(0, workspaceSpace));
-  const workspaceWidth = clampWidth(workspace.width, workspaceSize);
-  const sidebarSize = effectiveSize('sidebar', Math.max(0, mode === 'docked' ? budget - (
-    workspace.collapsed ? COLLAPSED_WIDTHS.workspace : workspaceWidth
-  ) : sidebarSpace));
-  return {
-    sidebar: { width: sidebarWidth, size: sidebarSize },
-    workspace: { width: workspaceWidth, size: workspaceSize },
-  };
+  if (mode !== 'docked') {
+    const sidebarSize = effectiveSize('sidebar', Math.max(0, mode === 'compact'
+      ? containerWidth - SIDEBAR_OVERLAY_CLEARANCE : budget - COLLAPSED_WIDTHS.workspace));
+    const workspaceSize = effectiveSize('workspace', Math.max(0, Math.min(PANE_SIZES.workspace.default, containerWidth - WORKSPACE_OVERLAY_CLEARANCE)));
+    return {
+      sidebar: { width: clampWidth(sidebar.width, sidebarSize), size: sidebarSize },
+      workspace: { width: clampWidth(workspace.width, workspaceSize), size: workspaceSize },
+    };
+  }
+
+  const panes = { sidebar, workspace };
+  const otherSide = priority === 'sidebar' ? 'workspace' : 'sidebar';
+  const active = panes[priority];
+  const other = panes[otherSide];
+  const activeSize = effectiveSize(priority, Math.max(0, budget - (
+    other.collapsed ? COLLAPSED_WIDTHS[otherSide] : PANE_SIZES[otherSide].min
+  )));
+  const activeWidth = clampWidth(active.width, activeSize);
+  // Reserve the active pane's default so shrinking it does not grow the untouched pane.
+  const baselineSidebar = clampWidth(priority === 'sidebar' ? PANE_SIZES.sidebar.default : sidebar.width,
+    effectiveSize('sidebar', Math.max(0, budget - (workspace.collapsed ? COLLAPSED_WIDTHS.workspace : PANE_SIZES.workspace.min))));
+  const otherBaseline = priority === 'sidebar'
+    ? budget - baselineSidebar : baselineSidebar;
+  const otherSpace = Math.max(0, budget - (active.collapsed ? COLLAPSED_WIDTHS[priority] : activeWidth));
+  const otherSize = effectiveSize(otherSide, otherSpace);
+  const otherWidth = clampWidth(other.width, effectiveSize(otherSide, active.collapsed ? otherSpace : Math.min(otherSpace, otherBaseline)));
+  const activeFit = { width: activeWidth, size: activeSize };
+  const otherFit = { width: otherWidth, size: otherSize };
+  return priority === 'sidebar'
+    ? { sidebar: activeFit, workspace: otherFit }
+    : { sidebar: otherFit, workspace: activeFit };
 }
