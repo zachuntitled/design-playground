@@ -362,8 +362,8 @@
 }
 
 .message time {
-  margin-left: var(--frame-gap);
-  color: var(--text-soft);
+  margin-left: 8px;
+  color: var(--text-muted);
   font-size: 10px;
   font-weight: 400;
 }
