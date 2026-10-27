@@ -11,6 +11,7 @@ import {
 } from './pane-size';
 import { initialPanes, isOverlay, paneReducer } from './pane-state';
 import styles from './workspace.module.css';
+import theme from './theme.module.css';
 
 function paneId(side: PaneSide) {
   return `lab-${side}`;
@@ -250,7 +251,7 @@ export default function AppShellWorkspaceExperiment() {
   return (
     <section
       ref={shell}
-      className={`${styles.theme} ${styles.shell}`}
+      className={`${theme.theme} ${styles.shell}`}
       aria-label="App shell workspace experiment"
       data-mode={mode}
       style={{

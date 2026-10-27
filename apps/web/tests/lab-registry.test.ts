@@ -19,6 +19,13 @@ describe('lab registry', () => {
     }
   });
 
+  it('loads compact page chrome only for the workspace experiment', async () => {
+    const workspace = await labExperiments.find((entry) => entry.slug === 'app-shell-workspace')!.load();
+    const sample = await labExperiments.find((entry) => entry.slug === 'sample')!.load();
+    expect(workspace.page).toEqual({ className: expect.any(String), compactHeader: true });
+    expect(sample.page).toBeUndefined();
+  });
+
   it('uses unique slugs', () => {
     const slugs = labExperiments.map((entry) => entry.slug);
     expect(new Set(slugs).size).toBe(slugs.length);
