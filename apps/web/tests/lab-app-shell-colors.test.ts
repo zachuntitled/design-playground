@@ -33,6 +33,30 @@ function colorsOutsideTokens(sheet: postcss.Root): string[] {
 }
 
 describe('app shell dark palette', () => {
+  it.each(['theme', 'labPage'])('defines the .%s rule consumed by page chrome', (className) => {
+    const theme = postcss.parse(readFileSync(resolve(directory, 'theme.module.css'), 'utf8'));
+    const selectors: string[] = [];
+    theme.walkRules((rule) => { selectors.push(...rule.selectors); });
+    expect(selectors).toContain(`.${className}`);
+  });
+
+  it.each([
+    ['.drawerHeader .iconButton', 'none'],
+    ['.sidebarDrawerHeader', 'none'],
+    ['.shell:not([data-mode="docked"]) .drawerHeader .iconButton', 'grid'],
+    ['.shell:not([data-mode="docked"]) .sidebarDrawerHeader', 'block'],
+  ])('sets %s display to %s for the docked-style focus fake', (selector, display) => {
+    const values: string[] = [];
+    for (const sheet of sheets) {
+      sheet.walkRules((rule) => {
+        if (rule.selectors.includes(selector)) {
+          rule.walkDecls('display', (declaration) => { values.push(declaration.value); });
+        }
+      });
+    }
+    expect(values).toEqual([display]);
+  });
+
   it.each(['sidebar', 'workspace'])('takes the %s drawer width and clearance only from the shared variables', (side) => {
     const widths: string[] = [];
     for (const sheet of sheets) {
