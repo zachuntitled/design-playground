@@ -209,6 +209,8 @@
 
 .notice {
   display: grid;
+  position: relative;
+  z-index: 7;
   flex: none;
   align-self: center;
   max-width: calc(100% - 32px);
