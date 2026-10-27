@@ -213,14 +213,9 @@ export default function AppShellWorkspaceExperiment() {
     pageElement.current?.toggleAttribute('inert', overlay !== null);
     const target = pendingFocus.current;
     pendingFocus.current = null;
-    let frame = 0;
-    function focusWhenVisible() {
-      if (!target?.isConnected || target.closest('[inert]')) return;
-      if (isPerceivable(target)) target.focus({ preventScroll: true });
-      else frame = requestAnimationFrame(focusWhenVisible);
+    if (target?.isConnected && !target.closest('[inert]')) {
+      target.focus({ preventScroll: true });
     }
-    focusWhenVisible();
-    return () => cancelAnimationFrame(frame);
   }, [panes, overlay, newsIndex]);
 
   function togglePane(side: PaneSide) {
