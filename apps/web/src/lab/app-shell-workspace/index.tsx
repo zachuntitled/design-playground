@@ -160,6 +160,7 @@ export default function AppShellWorkspaceExperiment() {
   const drawerClose = useRef<HTMLButtonElement>(null);
   const sidebarClose = useRef<HTMLButtonElement>(null);
   const overlayFocus = useRef<{ side: PaneSide; element: HTMLElement; pending: boolean } | null>(null);
+  const modeChangeFocus = useRef<{ side: PaneSide; element: Element } | null>(null);
   const shell = useRef<HTMLElement>(null);
   const sidebarElement = useRef<HTMLElement>(null);
   const workspaceElement = useRef<HTMLElement>(null);
@@ -176,8 +177,15 @@ export default function AppShellWorkspaceExperiment() {
     const measure = () => {
       const style = getComputedStyle(element);
       const width = element.getBoundingClientRect().width - parseFloat(style.borderLeftWidth || '0') - parseFloat(style.borderRightWidth || '0');
+      const nextMode = shellMode(width);
+      if (nextMode !== element.dataset.mode) {
+        const focused = document.activeElement;
+        const side = sidebarElement.current?.contains(focused) ? 'sidebar'
+          : workspaceElement.current?.contains(focused) ? 'workspace' : null;
+        modeChangeFocus.current = side && focused ? { side, element: focused } : null;
+      }
       setContainerWidth(width);
-      dispatch({ type: 'modeChanged', mode: shellMode(width) });
+      dispatch({ type: 'modeChanged', mode: nextMode });
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -186,10 +194,13 @@ export default function AppShellWorkspaceExperiment() {
   }, []);
 
   useLayoutEffect(() => {
+    const priorFocus = modeChangeFocus.current;
+    modeChangeFocus.current = null;
     toolbar.current?.toggleAttribute('inert', overlay !== null);
     for (const side of ['sidebar', 'workspace'] as const) {
       const element = (side === 'sidebar' ? sidebarElement : workspaceElement).current;
-      if (panes[side].collapsed && element?.contains(document.activeElement)) {
+      if ((panes[side].collapsed && element?.contains(document.activeElement))
+        || (priorFocus?.side === side && (panes[side].collapsed || !priorFocus.element.isConnected))) {
         (side === 'sidebar' ? sidebarToggle : workspaceToggle).current?.focus({ preventScroll: true });
       }
       element?.toggleAttribute('inert', !!panes[side].collapsed || (overlay !== null && overlay !== side));
