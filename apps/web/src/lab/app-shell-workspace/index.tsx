@@ -3,31 +3,14 @@
 import {
   useId, useLayoutEffect, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent,
 } from 'react';
-import { Button, Textarea } from '@open-design/components';
-import { Icon, type IconName } from '../../components/Icon';
+import { ShellIcon } from './icons';
+import { changelog, navigation, projects, setup, sources, tools } from './content';
 import {
   COLLAPSED_WIDTHS, FRAME_GAP, fitPanes, shellMode, resizeWidth, widthForKey,
   type PaneSide, type PaneSize, type PaneState,
 } from './pane-size';
 import { initialPanes, isOverlay, paneReducer } from './pane-state';
 import styles from './workspace.module.css';
-
-const tools: ReadonlyArray<{ id: string; label: string; icon: IconName; shortcut: string }> = [
-  { id: 'terminal', label: 'Terminal', icon: 'terminal', shortcut: '⌃`' },
-  { id: 'browser', label: 'Browser', icon: 'globe', shortcut: '⌘⇧B' },
-  { id: 'notes', label: 'Notes', icon: 'edit', shortcut: '⌘⇧N' },
-];
-const sources: ReadonlyArray<{ id: string; title: string; source: string; mark: string }> = [
-  { id: 'geo', title: 'GEO: Generative Engine Optimization', source: 'arxiv.org', mark: 'A' },
-  { id: 'tokens', title: 'Design tokens – naming guide', source: 'notion.so', mark: 'N' },
-  { id: 'q3', title: 'Q3 launch checklist', source: 'linear.app', mark: 'L' },
-];
-const navigation: ReadonlyArray<{ label: string; icon: IconName }> = [
-  { label: 'New chat', icon: 'edit' },
-  { label: 'Folders', icon: 'folder' },
-  { label: 'Integrations', icon: 'puzzle' },
-];
-const projects: ReadonlyArray<string> = ['Website refresh', 'Brand foundations', 'Product launch'];
 
 function paneId(side: PaneSide) {
   return `lab-${side}`;
@@ -105,7 +88,7 @@ function WorkspacePanel({ onOpen }: { onOpen: (label: string) => void }) {
   return (
     <div className={styles.panel}>
       <label className={styles.address}>
-        <Icon name="search" size={14} aria-hidden="true" />
+        <ShellIcon name="search" size={14} aria-hidden="true" />
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -119,12 +102,12 @@ function WorkspacePanel({ onOpen }: { onOpen: (label: string) => void }) {
           {tools.map((tool) => (
             <div key={tool.id} className={styles.row}>
               <button type="button" className={styles.open} onClick={() => onOpen(tool.label)}>
-                <span className={styles.tile}><Icon name={tool.icon} size={15} aria-hidden="true" /></span>
+                <span className={styles.tile}><ShellIcon name={tool.icon} size={15} aria-hidden="true" /></span>
                 <span className={styles.name}>{tool.label}</span>
                 <kbd className={styles.kbd}>{tool.shortcut}</kbd>
               </button>
               <button type="button" className={styles.more} aria-label={`More for ${tool.label}`} onClick={() => onOpen(`${tool.label} options`)}>
-                <Icon name="more-horizontal" size={15} aria-hidden="true" />
+                <ShellIcon name="more" size={15} aria-hidden="true" />
               </button>
             </div>
           ))}
@@ -140,7 +123,7 @@ function WorkspacePanel({ onOpen }: { onOpen: (label: string) => void }) {
                 <span className={styles.name}>{item.title}</span>
                 <span className={styles.meta}>{item.source}</span>
               </span>
-              <span className={styles.go}><Icon name="external-link" size={14} aria-hidden="true" /></span>
+              <span className={styles.go}><ShellIcon name="arrowUpRight" size={14} aria-hidden="true" /></span>
             </button>
           ))}
         </div>
@@ -152,7 +135,11 @@ function WorkspacePanel({ onOpen }: { onOpen: (label: string) => void }) {
 export default function AppShellWorkspaceExperiment() {
   const [panes, dispatch] = useReducer(paneReducer, initialPanes);
   const { sidebar, workspace, mode } = panes;
-  const [active, setActive] = useState('Website refresh');
+  const [active, setActive] = useState('New chat');
+  const [newsIndex, setNewsIndex] = useState(0);
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [completed, setCompleted] = useState(() => setup.flatMap((group) => group.tasks.filter((task) => task.done).map((task) => task.id)));
+  const setupProgress = Math.round(completed.length / setup.reduce((count, group) => count + group.tasks.length, 0) * 100);
   const [notice, setNotice] = useState('');
   const toolbar = useRef<HTMLElement>(null);
   const sidebarToggle = useRef<HTMLButtonElement>(null);
@@ -259,7 +246,7 @@ export default function AppShellWorkspaceExperiment() {
   return (
     <section
       ref={shell}
-      className={styles.shell}
+      className={`${styles.theme} ${styles.shell}`}
       aria-label="App shell workspace experiment"
       data-mode={mode}
       style={{
@@ -275,31 +262,27 @@ export default function AppShellWorkspaceExperiment() {
       }}
     >
       <header ref={toolbar} className={styles.toolbar}>
-        <Button
-          variant="ghost"
-          size="icon"
+        <button className={`${styles.iconButton} ${styles.sidebarToggle}`}
           aria-label={sidebar.collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           ref={sidebarToggle}
           aria-controls={paneId('sidebar')}
           aria-expanded={!sidebar.collapsed}
           onClick={(event) => togglePane('sidebar', event.currentTarget)}
         >
-          <Icon name="panel-left" size={18} aria-hidden="true" />
-        </Button>
+          <ShellIcon name="sidebarLeft" size={16} aria-hidden="true" />
+        </button>
         <span className={styles.breadcrumb}>OpenDesign <span>/</span> <strong>{active}</strong></span>
         <div className={styles.toolbarEnd}>
           <span className={styles.workspaceTitle}>Workspace</span>
-          <Button
-            variant="ghost"
-            size="icon"
+          <button className={`${styles.iconButton} ${styles.workspaceToggle}`}
             aria-label={workspace.collapsed ? 'Expand workspace' : 'Collapse workspace'}
             ref={workspaceToggle}
             aria-controls={paneId('workspace')}
             aria-expanded={!workspace.collapsed}
             onClick={(event) => togglePane('workspace', event.currentTarget)}
           >
-            <Icon name="layout-right" size={18} aria-hidden="true" />
-          </Button>
+            <ShellIcon name="sidebarRight" size={16} aria-hidden="true" />
+          </button>
         </div>
       </header>
       <button
@@ -322,13 +305,18 @@ export default function AppShellWorkspaceExperiment() {
           <div className={styles.sidebarInner}>
             <div className={styles.sidebarDrawerHeader}>
               <h2>Sidebar</h2>
-              <Button ref={sidebarClose} variant="ghost" size="icon" aria-label="Close sidebar" onClick={closeOverlay}>
-                <Icon name="close" size={18} aria-hidden="true" />
-              </Button>
+              <button ref={sidebarClose} className={styles.iconButton} aria-label="Close sidebar" onClick={closeOverlay}>
+                <ShellIcon name="sidebarLeft" size={16} />
+              </button>
             </div>
-            <div className={styles.identity}>
-              <span className={styles.logo}>O</span><strong>OpenDesign</strong>
-              <Icon name="chevron-down" aria-hidden="true" />
+            <div className={styles.sidebarHeader}>
+              <button type="button" className={styles.identity} onClick={() => setNotice('OpenDesign workspace selected.')}>
+                <span className={styles.logo}>O</span><strong>OpenDesign</strong>
+                <ShellIcon name="chevronDown" size={12} />
+              </button>
+              <button type="button" className={`${styles.iconButton} ${styles.sidebarSearch}`} aria-label="Search" onClick={() => setNotice('Search selected in this local layout preview.')}>
+                <ShellIcon name="search" size={16} />
+              </button>
             </div>
             <nav aria-label="Main navigation" className={styles.nav}>
               {navigation.map((item) => (
@@ -337,7 +325,7 @@ export default function AppShellWorkspaceExperiment() {
                   aria-current={active === item.label ? 'page' : undefined}
                   onClick={() => setActive(item.label)}
                 >
-                  <Icon name={item.icon} size={17} aria-hidden="true" />{item.label}
+                  <ShellIcon name={item.icon} size={16} aria-hidden="true" />{item.label}
                 </button>
               ))}
             </nav>
@@ -345,25 +333,67 @@ export default function AppShellWorkspaceExperiment() {
               <h3 className={styles.label}>Projects</h3>
               {projects.map((project) => (
                 <button
-                  type="button" key={project} className={styles.navItem}
-                  aria-current={active === project ? 'page' : undefined}
-                  onClick={() => setActive(project)}
+                  type="button" key={project.label} className={styles.navItem}
+                  aria-current={active === project.label ? 'page' : undefined}
+                  onClick={() => setActive(project.label)}
                 >
-                  <Icon name="comment" size={16} aria-hidden="true" /><span>{project}</span>
+                  <ShellIcon name={project.icon} size={16} /><span>{project.label}</span>
                 </button>
               ))}
             </div>
-            <div className={styles.account}>
-              <span className={styles.avatar}>ZM</span>
-              <div><strong>Zach Morgan</strong><span>Personal workspace</span></div>
-              <Icon name="chevron-down" aria-hidden="true" />
+            <div className={styles.sidebarFooter}>
+              <div className={styles.news} data-remaining={changelog.length - newsIndex}>
+                {changelog.map((item, index) => (
+                  <article key={item.id} className={styles.newsCard} data-position={index < newsIndex ? 'dismissed' : index === newsIndex ? 'front' : 'back'} aria-hidden={index !== newsIndex}>
+                    <div className={styles.newsHeading}>
+                      <span>New in OpenDesign</span>
+                      <button type="button" className={styles.dismiss} aria-label="Dismiss" tabIndex={index === newsIndex ? 0 : -1} onClick={() => setNewsIndex((value) => Math.min(value + 1, changelog.length))}>
+                        <ShellIcon name="close" size={13} />
+                      </button>
+                    </div>
+                    <strong>{item.title}</strong>
+                    <button type="button" className={styles.changelog} tabIndex={index === newsIndex ? 0 : -1} onClick={() => setNotice('Shared folders and scheduled chats are new in OpenDesign.')}>
+                      Full changelog<ShellIcon name="chevronRight" size={13} />
+                    </button>
+                  </article>
+                ))}
+              </div>
+              <div className={styles.setupSlot}>
+                <div className={styles.setupCard} data-open={setupOpen}>
+                  <button type="button" className={styles.setupSummary} aria-expanded={setupOpen} onClick={() => setSetupOpen(!setupOpen)}>
+                    <span className={styles.setupTitle}>Getting started<ShellIcon name="chevronRight" size={13} /></span>
+                    <span className={styles.setupSub}>{setupProgress}% done · <span>{setupProgress === 100 ? 'All done!' : setupProgress >= 60 ? 'Almost there!' : setupProgress > 0 ? 'Great start!' : "Let's go!"}</span></span>
+                    <span className={styles.progress} role="progressbar" aria-label="Getting started progress" aria-valuenow={setupProgress} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${Math.max(setupProgress, 4)}%` }} /></span>
+                  </button>
+                  <div className={styles.setupDetails} aria-hidden={!setupOpen}>
+                    <div>
+                      {setup.map((group) => (
+                        <fieldset key={group.title}>
+                          <legend>{group.title}</legend>
+                          {group.tasks.map((task) => (
+                            <label key={task.id}>
+                              <input type="checkbox" tabIndex={setupOpen ? 0 : -1} checked={completed.includes(task.id)} onChange={(event) => setCompleted((items) => event.target.checked ? [...items, task.id] : items.filter((id) => id !== task.id))} />
+                              {task.label}
+                            </label>
+                          ))}
+                        </fieldset>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <button type="button" className={styles.account} onClick={() => setNotice('Zach Morgan · Personal workspace')}>
+                <span className={styles.avatar}>ZM</span>
+                <span>Zach Morgan</span>
+                <ShellIcon name="chevronDown" size={13} />
+              </button>
             </div>
           </div>
           {!narrow && <ResizeEdge side="sidebar" pane={{ ...sidebar, width: fitted.sidebar.width }} size={fitted.sidebar.size} onResize={(width) => dispatch({ type: 'resize', side: 'sidebar', width })} onReset={() => dispatch({ type: 'reset', side: 'sidebar' })} />}
         </aside>
         <section ref={pageElement} className={styles.page} aria-label="Conversation">
           <div className={styles.pageHeader}>
-            <span><Icon name="comment" size={15} aria-hidden="true" /> {active}</span>
+            <span><ShellIcon name="project" size={15} aria-hidden="true" /> {active === 'New chat' ? 'Website refresh' : active}</span>
             <span className={styles.draft}>Draft</span>
           </div>
           <div className={styles.conversation}>
@@ -384,9 +414,9 @@ export default function AppShellWorkspaceExperiment() {
                 <p>I’d start with a simpler frame, a quieter palette, and a stronger rhythm between each section.</p>
                 <p>I’ve gathered a few references in your workspace. We can keep them beside the conversation as we shape the first direction.</p>
                 <div className={styles.suggestion}>
-                  <Icon name="layers-filled" size={17} aria-hidden="true" />
+                  <ShellIcon name="file" size={17} aria-hidden="true" />
                   <span><strong>Website direction</strong><span>Layout exploration · 3 references</span></span>
-                  <Icon name="external-link" size={15} aria-hidden="true" />
+                  <ShellIcon name="arrowUpRight" size={15} aria-hidden="true" />
                 </div>
               </div>
             </article>
@@ -398,12 +428,12 @@ export default function AppShellWorkspaceExperiment() {
               setNotice('Preview message received.');
             }}
           >
-            <Textarea aria-label="Message OpenDesign" placeholder="What would you like to explore?" rows={2} />
+            <textarea aria-label="Message OpenDesign" placeholder="What would you like to explore?" rows={2} />
             <div>
               <span>Local design preview</span>
-              <Button type="submit" variant="primary" size="icon" aria-label="Send preview message">
-                <Icon name="arrow-up" size={16} aria-hidden="true" />
-              </Button>
+              <button type="submit" className={styles.iconButton} aria-label="Send preview message">
+                <ShellIcon name="arrowUp" size={16} aria-hidden="true" />
+              </button>
             </div>
           </form>
         </section>
@@ -420,12 +450,12 @@ export default function AppShellWorkspaceExperiment() {
           <div className={styles.workspaceInner}>
             <div className={styles.drawerHeader}>
               <h2>Workspace</h2>
-              <Button ref={drawerClose} variant="ghost" size="icon" aria-label="Close workspace" onClick={closeOverlay}>
-                <Icon name="close" size={18} aria-hidden="true" />
-              </Button>
+              <button ref={drawerClose} className={styles.iconButton} aria-label="Close workspace" onClick={closeOverlay}>
+                <ShellIcon name="sidebarRight" size={16} />
+              </button>
             </div>
             <WorkspacePanel onOpen={(label) => setNotice(`${label} selected in this local layout preview.`)} />
-            <p className={styles.panelHint}>Everything you need,<br />right where you’re working.</p>
+
           </div>
         </aside>
       </div>
