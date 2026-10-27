@@ -209,13 +209,10 @@
 
 .notice {
   display: grid;
-  position: absolute;
-  bottom: 22px;
-  left: 50%;
-  z-index: 7;
-  translate: -50% 0;
+  flex: none;
+  align-self: center;
   max-width: calc(100% - 32px);
-  pointer-events: none;
+  max-height: 25%;
   grid-template-rows: 0fr;
   opacity: 0;
   font-size: 11px;
@@ -224,11 +221,13 @@
 }
 
 .notice > div {
-  overflow: hidden;
+  overflow: auto;
+  overscroll-behavior: contain;
   min-height: 0;
 }
 
 .noticeOpen {
+  margin-bottom: 12px;
   grid-template-rows: 1fr;
   opacity: 1;
 }
@@ -236,6 +235,7 @@
 .notice p {
   margin: 0;
   padding: 8px 12px;
+  overflow-wrap: anywhere;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--card);

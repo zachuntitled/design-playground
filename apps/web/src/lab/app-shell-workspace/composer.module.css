@@ -179,6 +179,7 @@
   right: calc(69 * var(--u));
   top: calc(83.2 * var(--u));
   box-sizing: border-box;
+  width: auto;
   height: calc((106.424 + var(--ui-cc-grow, 0)) * var(--u));
   transition: height var(--ui-cc-swap) var(--ui-cc-ease-swap);
   margin: 0;

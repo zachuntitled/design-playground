@@ -85,6 +85,30 @@ describe('Classic lab composer', () => {
     expect(screen.queryByRole('listbox')).toBeNull();
   });
 
+  it('flushes the positioned closed menu before revealing it on each open', () => {
+    mount();
+    const trigger = screen.getByRole('button', { name: 'Auto' });
+    let left = 300;
+    vi.spyOn(trigger, 'getBoundingClientRect').mockImplementation(() => new DOMRect(left, 400, 60, 24));
+    const getStyle = window.getComputedStyle.bind(window);
+    const flushed: { open: string | undefined; placing: string | undefined; left: string }[] = [];
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
+      if (element.getAttribute('role') === 'listbox') {
+        const menu = element.parentElement!;
+        flushed.push({ open: menu.dataset.open, placing: menu.dataset.placing, left: menu.style.left });
+      }
+      return getStyle(element);
+    });
+    fireEvent.click(trigger);
+    expect(flushed).toEqual([{ open: 'false', placing: 'true', left: '360px' }]);
+    expect(document.activeElement).toBe(screen.getByRole('listbox'));
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' });
+    left = 420;
+    fireEvent.click(trigger);
+    expect(flushed.at(-1)).toEqual({ open: 'false', placing: 'true', left: '480px' });
+    expect(document.activeElement).toBe(screen.getByRole('listbox'));
+  });
+
   it('closes an open model menu without taking focus from an inert parent', async () => {
     const { container } = mount();
     fireEvent.click(screen.getByRole('button', { name: 'Auto' }));

@@ -545,11 +545,11 @@ function ModelMenu({
   }, [open, anchor, container, models, selected.id, onClose]);
 
   useLayoutEffect(() => {
-    if (!open || visible || !panel.current || container.current?.closest("[inert]")) return;
+    if (!open || !placing || visible || !panel.current || container.current?.closest("[inert]")) return;
     void getComputedStyle(panel.current).clipPath;
     setPlacing(false);
     setVisible(true);
-  }, [open, place, visible, container]);
+  }, [open, place, placing, visible, container]);
 
   useLayoutEffect(() => {
     menu.current?.toggleAttribute("inert", !open || !visible);
