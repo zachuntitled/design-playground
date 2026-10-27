@@ -160,6 +160,7 @@ export default function AppShellWorkspaceExperiment() {
   const drawerClose = useRef<HTMLButtonElement>(null);
   const sidebarClose = useRef<HTMLButtonElement>(null);
   const overlayFocus = useRef<{ side: PaneSide; element: HTMLElement; pending: boolean } | null>(null);
+  const measuredMode = useRef(initialPanes.mode);
   const modeChangeFocus = useRef<{ side: PaneSide; element: Element } | null>(null);
   const shell = useRef<HTMLElement>(null);
   const sidebarElement = useRef<HTMLElement>(null);
@@ -178,13 +179,14 @@ export default function AppShellWorkspaceExperiment() {
       const style = getComputedStyle(element);
       const width = element.getBoundingClientRect().width - parseFloat(style.borderLeftWidth || '0') - parseFloat(style.borderRightWidth || '0');
       const nextMode = shellMode(width);
-      if (nextMode !== element.dataset.mode) {
+      if (nextMode !== measuredMode.current) {
         const focused = document.activeElement;
         const side = sidebarElement.current?.contains(focused) ? 'sidebar'
           : workspaceElement.current?.contains(focused) ? 'workspace' : null;
         modeChangeFocus.current = side && focused ? { side, element: focused } : null;
       }
       setContainerWidth(width);
+      measuredMode.current = nextMode;
       dispatch({ type: 'modeChanged', mode: nextMode });
     };
     measure();
