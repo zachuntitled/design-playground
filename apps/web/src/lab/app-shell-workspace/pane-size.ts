@@ -41,6 +41,7 @@ const DRAWER_BREAKPOINT = 900;
 const COMPACT_BREAKPOINT = 600;
 const MIN_PAGE_WIDTH = 320;
 export const FRAME_GAP = 8;
+export const DRAWER_SIZES = { sidebar: 264, workspace: 360, clearance: 56 } as const;
 export const COLLAPSED_WIDTHS = { sidebar: 0, workspace: FRAME_GAP } as const;
 
 export function shellMode(containerWidth: number): ShellMode {

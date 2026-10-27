@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
-  clampWidth, fitPanes, PANE_SIZES, resizeWidth, shellMode, widthForKey, type PaneState,
+  DRAWER_SIZES, clampWidth, fitPanes, PANE_SIZES, resizeWidth, shellMode, widthForKey, type PaneState,
 } from '../src/lab/app-shell-workspace/pane-size';
 import { initialPanes, paneReducer } from '../src/lab/app-shell-workspace/pane-state';
 
 describe('lab app shell pane sizes', () => {
+  it('keeps drawer widths and clearance separate from docked defaults', () => {
+    expect(DRAWER_SIZES).toEqual({ sidebar: 264, workspace: 360, clearance: 56 });
+    expect(PANE_SIZES.sidebar.default).toBe(272);
+    expect(PANE_SIZES.workspace.default).toBe(360);
+  });
+
   it.each(['sidebar', 'workspace'] as const)('clamps %s widths and uses directional pointer and keyboard steps', (side) => {
     const size = PANE_SIZES[side];
     const direction = side === 'sidebar' ? 1 : -1;

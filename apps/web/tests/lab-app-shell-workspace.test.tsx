@@ -43,6 +43,16 @@ function openWorkspace() {
 }
 
 describe('lab app shell interactions', () => {
+  it.each([820, 560])('uses drawer geometry independently of docked fitting at %s px', (width) => {
+    containerWidth = width;
+    render(<AppShellWorkspaceExperiment />);
+    const shell = screen.getByRole('region', { name: 'App shell workspace experiment' });
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }));
+    expect(shell.style.getPropertyValue('--sidebar-width')).toBe('264px');
+    expect(shell.style.getPropertyValue('--workspace-width')).toBe('360px');
+    expect(shell.style.getPropertyValue('--drawer-clearance')).toBe('56px');
+  });
+
   it('makes folded panes inert and preserves workspace toggle focus', () => {
     render(<AppShellWorkspaceExperiment />);
     const workspace = screen.getByRole('complementary', { name: 'Workspace' });

@@ -6,7 +6,7 @@ import {
 import { ShellIcon } from './icons';
 import { changelog, navigation, projects, setup, sources, tools } from './content';
 import {
-  COLLAPSED_WIDTHS, FRAME_GAP, fitPanes, shellMode, resizeWidth, widthForKey,
+  COLLAPSED_WIDTHS, DRAWER_SIZES, FRAME_GAP, fitPanes, shellMode, resizeWidth, widthForKey,
   type PaneSide, type PaneSize, type PaneState,
 } from './pane-size';
 import { initialPanes, isOverlay, paneReducer } from './pane-state';
@@ -162,7 +162,7 @@ export default function AppShellWorkspaceExperiment() {
   const narrow = isOverlay(mode);
   const overlay = narrow && !workspace.collapsed ? 'workspace'
     : narrow && !sidebar.collapsed ? 'sidebar' : null;
-  const fitted = fitPanes(containerWidth, sidebar, workspace, panes.lastResized);
+  const fitted = narrow ? null : fitPanes(containerWidth, sidebar, workspace, panes.lastResized);
 
   useLayoutEffect(() => {
     const element = shell.current;
@@ -255,9 +255,9 @@ export default function AppShellWorkspaceExperiment() {
       aria-label="App shell workspace experiment"
       data-mode={mode}
       style={{
-        '--sidebar-width': `${fitted.sidebar.width}px`, '--workspace-width': `${fitted.workspace.width}px`,
+        '--sidebar-width': `${fitted?.sidebar.width ?? DRAWER_SIZES.sidebar}px`, '--workspace-width': `${fitted?.workspace.width ?? DRAWER_SIZES.workspace}px`,
         '--sidebar-collapsed-width': `${COLLAPSED_WIDTHS.sidebar}px`, '--workspace-collapsed-width': `${COLLAPSED_WIDTHS.workspace}px`,
-        '--frame-gap': `${FRAME_GAP}px`,
+        '--frame-gap': `${FRAME_GAP}px`, '--drawer-clearance': `${DRAWER_SIZES.clearance}px`,
       } as CSSProperties}
       onKeyDown={(event) => {
         if (event.key === 'Escape' && overlay) {
@@ -400,7 +400,7 @@ export default function AppShellWorkspaceExperiment() {
               </button>
             </div>
           </div>
-          {!narrow && <ResizeEdge side="sidebar" pane={{ ...sidebar, width: fitted.sidebar.width }} size={fitted.sidebar.size} onResize={(width) => dispatch({ type: 'resize', side: 'sidebar', width })} onReset={() => dispatch({ type: 'reset', side: 'sidebar' })} />}
+          {fitted && <ResizeEdge side="sidebar" pane={{ ...sidebar, width: fitted.sidebar.width }} size={fitted.sidebar.size} onResize={(width) => dispatch({ type: 'resize', side: 'sidebar', width })} onReset={() => dispatch({ type: 'reset', side: 'sidebar' })} />}
         </aside>
         <section ref={pageElement} className={styles.page} aria-label="Conversation">
           <div className={styles.pageHeader}>
@@ -457,7 +457,7 @@ export default function AppShellWorkspaceExperiment() {
           aria-modal={overlay === 'workspace' ? true : undefined}
           onKeyDown={overlay === 'workspace' ? trapFocus : undefined}
         >
-          {!narrow && <ResizeEdge side="workspace" pane={{ ...workspace, width: fitted.workspace.width }} size={fitted.workspace.size} onResize={(width) => dispatch({ type: 'resize', side: 'workspace', width })} onReset={() => dispatch({ type: 'reset', side: 'workspace' })} />}
+          {fitted && <ResizeEdge side="workspace" pane={{ ...workspace, width: fitted.workspace.width }} size={fitted.workspace.size} onResize={(width) => dispatch({ type: 'resize', side: 'workspace', width })} onReset={() => dispatch({ type: 'reset', side: 'workspace' })} />}
           <div className={styles.workspaceInner}>
             <div className={styles.drawerHeader}>
               <h2>Workspace</h2>

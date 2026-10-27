@@ -1002,13 +1002,13 @@
   position: absolute;
   z-index: 6;
   inset: 0 0 0 auto;
-  width: min(var(--workspace-drawer-width), calc(100% - var(--drawer-clearance)));
+  width: min(var(--workspace-width), calc(100% - var(--drawer-clearance)));
   border-radius: var(--drawer-radius) 0 0 var(--drawer-radius);
   background: var(--page);
   box-shadow: 0 0 0 1px var(--line), var(--drawer-shadow);
   opacity: 1;
   translate: 0 0;
-  transition: translate var(--drawer-enter) var(--ease), visibility 0s;
+  transition: width var(--drawer-enter) var(--ease), translate var(--drawer-enter) var(--ease), visibility 0s;
 }
 
 .shell:not([data-mode="docked"]) .workspaceInner {
@@ -1018,7 +1018,7 @@
 .shell:not([data-mode="docked"]) .workspaceCollapsed {
   translate: calc(100% + 24px) 0;
   visibility: hidden;
-  transition: translate var(--drawer-exit) var(--ease), visibility 0s var(--drawer-exit);
+  transition: width var(--drawer-exit) var(--ease), translate var(--drawer-exit) var(--ease), visibility 0s var(--drawer-exit);
 }
 
 .shell:not([data-mode="docked"]) .drawerHeader .iconButton {
@@ -1075,19 +1075,19 @@
   position: absolute;
   z-index: 6;
   inset: 0 auto 0 0;
-  width: min(var(--sidebar-drawer-width), calc(100% - var(--drawer-clearance)));
+  width: min(var(--sidebar-width), calc(100% - var(--drawer-clearance)));
   border-radius: 0 var(--drawer-radius) var(--drawer-radius) 0;
   background: var(--page);
   box-shadow: 0 0 0 1px var(--line), var(--drawer-shadow);
   opacity: 1;
   translate: 0 0;
-  transition: translate var(--drawer-enter) var(--ease), visibility 0s;
+  transition: width var(--drawer-enter) var(--ease), translate var(--drawer-enter) var(--ease), visibility 0s;
 }
 
 .shell:not([data-mode="docked"]) .sidebarCollapsed {
   translate: calc(-100% - 24px) 0;
   visibility: hidden;
-  transition: translate var(--drawer-exit) var(--ease), visibility 0s var(--drawer-exit);
+  transition: width var(--drawer-exit) var(--ease), translate var(--drawer-exit) var(--ease), visibility 0s var(--drawer-exit);
 }
 
 .shell:not([data-mode="docked"]) .sidebarInner {
