@@ -193,12 +193,12 @@
   color: var(--muted);
 }
 
-.sendButton {
+.composer .sendButton {
   background: var(--button);
   color: var(--on-ink);
 }
 
-.sendButton:hover {
+.composer .sendButton:hover {
   background: var(--button-hover);
   color: var(--on-ink);
 }

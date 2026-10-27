@@ -33,6 +33,17 @@ function colorsOutsideTokens(sheet: postcss.Root): string[] {
 }
 
 describe('app shell dark palette', () => {
+  it.each(['sidebar', 'workspace'])('takes the %s drawer width and clearance only from the shared variables', (side) => {
+    const widths: string[] = [];
+    for (const sheet of sheets) {
+      sheet.walkRules(`.shell:not([data-mode="docked"]) .${side}`, (rule) => {
+        rule.walkDecls('width', (declaration) => { widths.push(declaration.value); });
+      });
+    }
+    expect(widths).toEqual([`min(var(--${side}-width), calc(100% - var(--drawer-clearance)))`]);
+    expect(widths.join('')).not.toMatch(/\d+(?:\.\d+)?px/);
+  });
+
   it('registers only the experiment font family', () => {
     const families: string[] = [];
     for (const sheet of sheets) {
