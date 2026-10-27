@@ -305,4 +305,33 @@ describe('lab app shell interactions', () => {
     expect(document.activeElement).toBe(toggle);
   });
 
+  it('dismisses the changelog cards in order without removing their nodes', () => {
+    render(<AppShellWorkspaceExperiment />);
+    const shared = screen.getByText('Shared folders').closest('article')!;
+    const scheduled = screen.getByText('Scheduled chats').closest('article')!;
+    expect(shared.getAttribute('aria-hidden')).toBe('false');
+    expect(scheduled.getAttribute('aria-hidden')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(shared.isConnected).toBe(true);
+    expect(shared.getAttribute('aria-hidden')).toBe('true');
+    expect(scheduled.getAttribute('aria-hidden')).toBe('false');
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(scheduled.isConnected).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull();
+  });
+
+  it('shows setup progress and preserves completed tasks across collapse', () => {
+    render(<AppShellWorkspaceExperiment />);
+    const summary = screen.getByRole('button', { name: /Getting started/ });
+    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('13');
+    fireEvent.click(summary);
+    expect(summary.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Invite your teammates' }));
+    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('25');
+    fireEvent.click(summary);
+    expect(screen.queryByRole('checkbox', { name: 'Invite your teammates' })).toBeNull();
+    fireEvent.click(summary);
+    expect((screen.getByRole('checkbox', { name: 'Invite your teammates' }) as HTMLInputElement).checked).toBe(true);
+  });
+
 });
