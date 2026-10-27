@@ -44,7 +44,6 @@
   --faint: #71717a;
   --placeholder: #71717a;
   --chip: #232326;
-  --chip-hover: #2c2c30;
   --hover: rgba(255, 255, 255, 0.05);
   --select: rgba(255, 255, 255, 0.08);
   --accent: #6d8bff;
@@ -55,10 +54,6 @@
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   --edge-active: #55555c;
   --subtle: #18181b;
-  --disabled: #3a3a3f;
-  --ink-hover: #d4d4d8;
-  --toggle-off: #3a3a3f;
-  --switch-on: #6d8bff;
   --logo-bg: #2a2a2e;
   --logo-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 1px 1px rgba(0, 0, 0, 0.12);
   --news-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
