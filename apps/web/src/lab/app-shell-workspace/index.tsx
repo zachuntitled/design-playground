@@ -382,9 +382,9 @@ export default function AppShellWorkspaceExperiment() {
                   </div>
                 </div>
               </div>
-              <button type="button" className={styles.account} onClick={() => setNotice('Zach Morgan · Personal workspace')}>
-                <span className={styles.avatar}>ZM</span>
-                <span>Zach Morgan</span>
+              <button type="button" className={styles.account} onClick={() => setNotice('Alex Morgan · Personal workspace')}>
+                <span className={styles.avatar}>AM</span>
+                <span>Alex Morgan</span>
                 <ShellIcon name="chevronDown" size={13} />
               </button>
             </div>
@@ -401,7 +401,7 @@ export default function AppShellWorkspaceExperiment() {
             <h2>A little more room<br />for your next idea.</h2>
             <p className={styles.intro}>Bring your research, tools, and conversation into one focused workspace.</p>
             <article className={styles.message} aria-label="Your message">
-              <span className={styles.messageAvatar}>ZM</span>
+              <span className={styles.messageAvatar}>AM</span>
               <div>
                 <h3>You <time>10:42</time></h3>
                 <p>Let’s explore a calmer direction for our website. Something clear and considered, with space for the work to speak.</p>
