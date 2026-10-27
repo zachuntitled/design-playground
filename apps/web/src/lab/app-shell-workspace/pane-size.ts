@@ -41,10 +41,7 @@ const DRAWER_BREAKPOINT = 900;
 const COMPACT_BREAKPOINT = 600;
 const MIN_PAGE_WIDTH = 320;
 export const FRAME_GAP = 8;
-// Mirrors the compact sidebar clearance beside the overlay.
-const SIDEBAR_OVERLAY_CLEARANCE = 48;
-// Mirrors the workspace overlay clearance including the page frame gap.
-const WORKSPACE_OVERLAY_CLEARANCE = SIDEBAR_OVERLAY_CLEARANCE + FRAME_GAP;
+export const DRAWER_SIZES = { sidebar: 264, workspace: 360, clearance: 56 } as const;
 export const COLLAPSED_WIDTHS = { sidebar: 0, workspace: FRAME_GAP } as const;
 
 export function shellMode(containerWidth: number): ShellMode {
@@ -58,18 +55,8 @@ function effectiveSize(side: PaneSide, available: number): PaneSize {
   return { min, max, default: Math.min(max, Math.max(min, PANE_SIZES[side].default)) };
 }
 
-export function fitPanes(containerWidth: number, mode: ShellMode, sidebar: PaneState, workspace: PaneState, priority: PaneSide = 'sidebar') {
+export function fitPanes(containerWidth: number, sidebar: PaneState, workspace: PaneState, priority: PaneSide = 'sidebar') {
   const budget = Math.max(0, containerWidth - MIN_PAGE_WIDTH - FRAME_GAP);
-  if (mode !== 'docked') {
-    const sidebarSize = effectiveSize('sidebar', Math.max(0, mode === 'compact'
-      ? containerWidth - SIDEBAR_OVERLAY_CLEARANCE : budget - COLLAPSED_WIDTHS.workspace));
-    const workspaceSize = effectiveSize('workspace', Math.max(0, Math.min(PANE_SIZES.workspace.default, containerWidth - WORKSPACE_OVERLAY_CLEARANCE)));
-    return {
-      sidebar: { width: clampWidth(sidebar.width, sidebarSize), size: sidebarSize },
-      workspace: { width: clampWidth(workspace.width, workspaceSize), size: workspaceSize },
-    };
-  }
-
   const panes = { sidebar, workspace };
   const otherSide = priority === 'sidebar' ? 'workspace' : 'sidebar';
   const active = panes[priority];

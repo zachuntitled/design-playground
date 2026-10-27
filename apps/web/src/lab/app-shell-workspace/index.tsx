@@ -3,31 +3,27 @@
 import {
   useId, useLayoutEffect, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent,
 } from 'react';
-import { Button, Textarea } from '@open-design/components';
-import { Icon, type IconName } from '../../components/Icon';
+import { ShellIcon } from './icons';
+import { changelog, navigation, projects, setup, sources, tools } from './content';
 import {
-  COLLAPSED_WIDTHS, FRAME_GAP, fitPanes, shellMode, resizeWidth, widthForKey,
+  COLLAPSED_WIDTHS, DRAWER_SIZES, FRAME_GAP, fitPanes, shellMode, resizeWidth, widthForKey,
   type PaneSide, type PaneSize, type PaneState,
 } from './pane-size';
 import { initialPanes, isOverlay, paneReducer } from './pane-state';
-import styles from './workspace.module.css';
+import frameStyles from './frame.module.css';
+import sidebarStyles from './sidebar.module.css';
+import conversationStyles from './conversation.module.css';
+import panelStyles from './panel.module.css';
+import { themeClassName } from './page-chrome';
 
-const tools: ReadonlyArray<{ id: string; label: string; icon: IconName; shortcut: string }> = [
-  { id: 'terminal', label: 'Terminal', icon: 'terminal', shortcut: '⌃`' },
-  { id: 'browser', label: 'Browser', icon: 'globe', shortcut: '⌘⇧B' },
-  { id: 'notes', label: 'Notes', icon: 'edit', shortcut: '⌘⇧N' },
-];
-const sources: ReadonlyArray<{ id: string; title: string; source: string; mark: string }> = [
-  { id: 'geo', title: 'GEO: Generative Engine Optimization', source: 'arxiv.org', mark: 'A' },
-  { id: 'tokens', title: 'Design tokens – naming guide', source: 'notion.so', mark: 'N' },
-  { id: 'q3', title: 'Q3 launch checklist', source: 'linear.app', mark: 'L' },
-];
-const navigation: ReadonlyArray<{ label: string; icon: IconName }> = [
-  { label: 'New chat', icon: 'edit' },
-  { label: 'Folders', icon: 'folder' },
-  { label: 'Integrations', icon: 'puzzle' },
-];
-const projects: ReadonlyArray<string> = ['Website refresh', 'Brand foundations', 'Product launch'];
+function isPerceivable(element: Element) {
+  if (!element.isConnected) return false;
+  for (let ancestor: Element | null = element; ancestor; ancestor = ancestor.parentElement) {
+    const style = getComputedStyle(ancestor);
+    if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+  }
+  return true;
+}
 
 function paneId(side: PaneSide) {
   return `lab-${side}`;
@@ -60,7 +56,7 @@ function ResizeEdge({ side, pane, size, onResize, onReset }: {
   return (
     <div
       ref={edge}
-      className={`${styles.resizeEdge} ${side === 'workspace' ? styles.rightEdge : ''}`}
+      className={`${frameStyles.resizeEdge} ${side === 'workspace' ? frameStyles.rightEdge : ''}`}
       role="separator"
       aria-label={`Resize ${side}`}
       aria-controls={paneId(side)}
@@ -103,9 +99,9 @@ function WorkspacePanel({ onOpen }: { onOpen: (label: string) => void }) {
   const toolsHeading = useId();
   const suggestedHeading = useId();
   return (
-    <div className={styles.panel}>
-      <label className={styles.address}>
-        <Icon name="search" size={14} aria-hidden="true" />
+    <div className={panelStyles.panel}>
+      <label className={panelStyles.address}>
+        <ShellIcon name="search" size={14} aria-hidden="true" />
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -113,34 +109,34 @@ function WorkspacePanel({ onOpen }: { onOpen: (label: string) => void }) {
           aria-label="Search or enter URL"
         />
       </label>
-      <section className={styles.section} aria-labelledby={toolsHeading}>
-        <h3 id={toolsHeading} className={styles.label}>Tools</h3>
-        <div className={styles.list}>
+      <section className={panelStyles.section} aria-labelledby={toolsHeading}>
+        <h3 id={toolsHeading} className={panelStyles.label}>Tools</h3>
+        <div className={panelStyles.list}>
           {tools.map((tool) => (
-            <div key={tool.id} className={styles.row}>
-              <button type="button" className={styles.open} onClick={() => onOpen(tool.label)}>
-                <span className={styles.tile}><Icon name={tool.icon} size={15} aria-hidden="true" /></span>
-                <span className={styles.name}>{tool.label}</span>
-                <kbd className={styles.kbd}>{tool.shortcut}</kbd>
+            <div key={tool.id} className={panelStyles.row}>
+              <button type="button" className={panelStyles.open} onClick={() => onOpen(tool.label)}>
+                <span className={panelStyles.tile}><ShellIcon name={tool.icon} size={15} aria-hidden="true" /></span>
+                <span className={panelStyles.name}>{tool.label}</span>
+                <kbd className={panelStyles.kbd}>{tool.shortcut}</kbd>
               </button>
-              <button type="button" className={styles.more} aria-label={`More for ${tool.label}`} onClick={() => onOpen(`${tool.label} options`)}>
-                <Icon name="more-horizontal" size={15} aria-hidden="true" />
+              <button type="button" className={panelStyles.more} aria-label={`More for ${tool.label}`} onClick={() => onOpen(`${tool.label} options`)}>
+                <ShellIcon name="more" size={15} aria-hidden="true" />
               </button>
             </div>
           ))}
         </div>
       </section>
-      <section className={styles.section} aria-labelledby={suggestedHeading}>
-        <h3 id={suggestedHeading} className={styles.label}>Suggested</h3>
-        <div className={styles.list}>
+      <section className={panelStyles.section} aria-labelledby={suggestedHeading}>
+        <h3 id={suggestedHeading} className={panelStyles.label}>Suggested</h3>
+        <div className={panelStyles.list}>
           {sources.map((item) => (
-            <button key={item.id} type="button" className={`${styles.row} ${styles.open} ${styles.source}`} onClick={() => onOpen(item.title)}>
-              <span className={`${styles.tile} ${styles.mark}`}>{item.mark}</span>
-              <span className={styles.sourceText}>
-                <span className={styles.name}>{item.title}</span>
-                <span className={styles.meta}>{item.source}</span>
+            <button key={item.id} type="button" className={`${panelStyles.row} ${panelStyles.open} ${panelStyles.source}`} onClick={() => onOpen(item.title)}>
+              <span className={`${panelStyles.tile} ${panelStyles.mark}`}>{item.mark}</span>
+              <span className={panelStyles.sourceText}>
+                <span className={panelStyles.name}>{item.title}</span>
+                <span className={panelStyles.meta}>{item.source}</span>
               </span>
-              <span className={styles.go}><Icon name="external-link" size={14} aria-hidden="true" /></span>
+              <span className={panelStyles.go}><ShellIcon name="arrowUpRight" size={14} aria-hidden="true" /></span>
             </button>
           ))}
         </div>
@@ -152,14 +148,21 @@ function WorkspacePanel({ onOpen }: { onOpen: (label: string) => void }) {
 export default function AppShellWorkspaceExperiment() {
   const [panes, dispatch] = useReducer(paneReducer, initialPanes);
   const { sidebar, workspace, mode } = panes;
-  const [active, setActive] = useState('Website refresh');
+  const [active, setActive] = useState('New chat');
+  const [newsIndex, setNewsIndex] = useState(0);
+  const [setupOpen, setSetupOpen] = useState(false);
+  const dismissButtons = useRef<(HTMLButtonElement | null)[]>([]);
+  const setupSummary = useRef<HTMLButtonElement>(null);
+  const setupDetails = useRef<HTMLDivElement>(null);
+  const [completed, setCompleted] = useState(() => setup.flatMap((group) => group.tasks.filter((task) => task.done).map((task) => task.id)));
+  const setupProgress = Math.round(completed.length / setup.reduce((count, group) => count + group.tasks.length, 0) * 100);
   const [notice, setNotice] = useState('');
   const toolbar = useRef<HTMLElement>(null);
   const sidebarToggle = useRef<HTMLButtonElement>(null);
   const workspaceToggle = useRef<HTMLButtonElement>(null);
   const drawerClose = useRef<HTMLButtonElement>(null);
   const sidebarClose = useRef<HTMLButtonElement>(null);
-  const overlayFocus = useRef<{ side: PaneSide; element: HTMLElement; pending: boolean } | null>(null);
+  const pendingFocus = useRef<HTMLButtonElement | null>(null);
   const measuredMode = useRef(initialPanes.mode);
   const modeChangeFocus = useRef<{ side: PaneSide; element: Element } | null>(null);
   const shell = useRef<HTMLElement>(null);
@@ -167,10 +170,10 @@ export default function AppShellWorkspaceExperiment() {
   const workspaceElement = useRef<HTMLElement>(null);
   const pageElement = useRef<HTMLElement>(null);
   const [containerWidth, setContainerWidth] = useState(1440);
-  const narrow = mode !== 'docked';
+  const narrow = isOverlay(mode);
   const overlay = narrow && !workspace.collapsed ? 'workspace'
-    : mode === 'compact' && !sidebar.collapsed ? 'sidebar' : null;
-  const fitted = fitPanes(containerWidth, mode, sidebar, workspace, panes.lastResized);
+    : narrow && !sidebar.collapsed ? 'sidebar' : null;
+  const fitted = narrow ? null : fitPanes(containerWidth, sidebar, workspace, panes.lastResized);
 
   useLayoutEffect(() => {
     const element = shell.current;
@@ -202,49 +205,40 @@ export default function AppShellWorkspaceExperiment() {
     for (const side of ['sidebar', 'workspace'] as const) {
       const element = (side === 'sidebar' ? sidebarElement : workspaceElement).current;
       if ((panes[side].collapsed && element?.contains(document.activeElement))
-        || (priorFocus?.side === side && (panes[side].collapsed || !priorFocus.element.isConnected))) {
+        || (priorFocus?.side === side && (panes[side].collapsed || !isPerceivable(priorFocus.element)))) {
         (side === 'sidebar' ? sidebarToggle : workspaceToggle).current?.focus({ preventScroll: true });
       }
       element?.toggleAttribute('inert', !!panes[side].collapsed || (overlay !== null && overlay !== side));
     }
     pageElement.current?.toggleAttribute('inert', overlay !== null);
-    const focus = overlayFocus.current;
-    if (!focus) return;
-    if (focus.side !== overlay) {
-      focus.element.focus({ preventScroll: true });
-      overlayFocus.current = null;
-    } else if (focus.pending) {
-      (overlay === 'workspace' ? drawerClose : sidebarClose).current?.focus({ preventScroll: true });
-      focus.pending = false;
+    const target = pendingFocus.current;
+    pendingFocus.current = null;
+    if (target?.isConnected && !target.closest('[inert]')) {
+      target.focus({ preventScroll: true });
     }
-  }, [panes, overlay]);
+  }, [panes, overlay, newsIndex]);
 
-  function togglePane(side: PaneSide, invoker: HTMLElement) {
-    if (panes[side].collapsed && isOverlay(side, mode)) {
-      const fallback = (side === 'sidebar' ? sidebarToggle : workspaceToggle).current!;
-      const element = invoker.matches('button:not(:disabled), a[href], input:not(:disabled), [tabindex]:not([tabindex="-1"])')
-        ? invoker : fallback;
-      overlayFocus.current = { side, element, pending: true };
+  function togglePane(side: PaneSide) {
+    if (narrow) {
+      pendingFocus.current = panes[side].collapsed
+        ? (side === 'sidebar' ? sidebarClose : drawerClose).current
+        : (side === 'sidebar' ? sidebarToggle : workspaceToggle).current;
     }
     dispatch({ type: 'toggle', side });
   }
 
   function closeOverlay() {
-    if (overlay) dispatch({ type: 'close', side: overlay });
+    if (!overlay) return;
+    pendingFocus.current = (overlay === 'sidebar' ? sidebarToggle : workspaceToggle).current;
+    dispatch({ type: 'close', side: overlay });
   }
 
   function trapFocus(event: KeyboardEvent<HTMLElement>) {
     if (event.key !== 'Tab') return;
     const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
       'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"]), [contenteditable]',
-    )).filter((element) => {
-      if (element.matches(':disabled, [tabindex="-1"], input[type="hidden"], [contenteditable="false"]') || element.closest('[hidden], [inert]')) return false;
-      for (let ancestor: HTMLElement | null = element; ancestor; ancestor = ancestor.parentElement) {
-        const style = getComputedStyle(ancestor);
-        if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') return false;
-      }
-      return true;
-    });
+    )).filter((element) => !element.matches(':disabled, [tabindex="-1"], input[type="hidden"], [contenteditable="false"]')
+      && !element.closest('[inert]') && isPerceivable(element));
     const first = controls[0];
     const last = controls[controls.length - 1];
     if (event.shiftKey && document.activeElement === first) {
@@ -259,13 +253,15 @@ export default function AppShellWorkspaceExperiment() {
   return (
     <section
       ref={shell}
-      className={styles.shell}
+      className={`${themeClassName} ${frameStyles.shell}`}
       aria-label="App shell workspace experiment"
       data-mode={mode}
+      data-sidebar-collapsed={!!sidebar.collapsed}
+      data-workspace-collapsed={!!workspace.collapsed}
       style={{
-        '--sidebar-width': `${fitted.sidebar.width}px`, '--workspace-width': `${fitted.workspace.width}px`,
+        '--sidebar-width': `${fitted?.sidebar.width ?? DRAWER_SIZES.sidebar}px`, '--workspace-width': `${fitted?.workspace.width ?? DRAWER_SIZES.workspace}px`,
         '--sidebar-collapsed-width': `${COLLAPSED_WIDTHS.sidebar}px`, '--workspace-collapsed-width': `${COLLAPSED_WIDTHS.workspace}px`,
-        '--frame-gap': `${FRAME_GAP}px`,
+        '--frame-gap': `${FRAME_GAP}px`, '--drawer-clearance': `${DRAWER_SIZES.clearance}px`,
       } as CSSProperties}
       onKeyDown={(event) => {
         if (event.key === 'Escape' && overlay) {
@@ -274,136 +270,185 @@ export default function AppShellWorkspaceExperiment() {
         }
       }}
     >
-      <header ref={toolbar} className={styles.toolbar}>
-        <Button
-          variant="ghost"
-          size="icon"
+      <header ref={toolbar} className={frameStyles.toolbar}>
+        <button className={`${frameStyles.iconButton} ${frameStyles.sidebarToggle}`}
           aria-label={sidebar.collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           ref={sidebarToggle}
           aria-controls={paneId('sidebar')}
           aria-expanded={!sidebar.collapsed}
-          onClick={(event) => togglePane('sidebar', event.currentTarget)}
+          onClick={() => togglePane('sidebar')}
         >
-          <Icon name="panel-left" size={18} aria-hidden="true" />
-        </Button>
-        <span className={styles.breadcrumb}>OpenDesign <span>/</span> <strong>{active}</strong></span>
-        <div className={styles.toolbarEnd}>
-          <span className={styles.workspaceTitle}>Workspace</span>
-          <Button
-            variant="ghost"
-            size="icon"
+          <ShellIcon name="sidebarLeft" size={16} aria-hidden="true" />
+        </button>
+        <span className={frameStyles.breadcrumb}>OpenDesign <span>/</span> <strong>{active}</strong></span>
+        <div>
+          <span className={frameStyles.workspaceTitle}>Workspace</span>
+          <button className={`${frameStyles.iconButton} ${frameStyles.workspaceToggle}`}
             aria-label={workspace.collapsed ? 'Expand workspace' : 'Collapse workspace'}
             ref={workspaceToggle}
             aria-controls={paneId('workspace')}
             aria-expanded={!workspace.collapsed}
-            onClick={(event) => togglePane('workspace', event.currentTarget)}
+            onClick={() => togglePane('workspace')}
           >
-            <Icon name="layout-right" size={18} aria-hidden="true" />
-          </Button>
+            <ShellIcon name="sidebarRight" size={16} aria-hidden="true" />
+          </button>
         </div>
       </header>
       <button
         type="button"
         aria-label={`Close ${overlay ?? 'workspace'} drawer`}
         tabIndex={-1}
-        className={`${styles.scrim} ${overlay ? '' : styles.scrimHidden}`}
+        className={`${frameStyles.scrim} ${overlay ? '' : frameStyles.scrimHidden}`}
         onClick={closeOverlay}
       />
-      <div className={styles.body}>
+      <div className={frameStyles.body}>
         <aside
           ref={sidebarElement}
           id={paneId('sidebar')}
           aria-label="Sidebar"
-          role={mode === 'compact' ? 'dialog' : undefined}
+          role={narrow ? 'dialog' : undefined}
           aria-modal={overlay === 'sidebar' ? true : undefined}
           onKeyDown={overlay === 'sidebar' ? trapFocus : undefined}
-          className={`${styles.sidebar} ${sidebar.collapsed ? styles.sidebarCollapsed : ''}`}
+          className={`${frameStyles.sidebar} ${sidebar.collapsed ? frameStyles.sidebarCollapsed : ''}`}
         >
-          <div className={styles.sidebarInner}>
-            <div className={styles.sidebarDrawerHeader}>
+          <div className={frameStyles.sidebarInner}>
+            <div className={frameStyles.sidebarDrawerHeader}>
               <h2>Sidebar</h2>
-              <Button ref={sidebarClose} variant="ghost" size="icon" aria-label="Close sidebar" onClick={closeOverlay}>
-                <Icon name="close" size={18} aria-hidden="true" />
-              </Button>
+              <button ref={sidebarClose} className={frameStyles.iconButton} aria-label="Close sidebar" onClick={closeOverlay}>
+                <ShellIcon name="sidebarLeft" size={16} />
+              </button>
             </div>
-            <div className={styles.identity}>
-              <span className={styles.logo}>O</span><strong>OpenDesign</strong>
-              <Icon name="chevron-down" aria-hidden="true" />
+            <div className={sidebarStyles.sidebarHeader}>
+              <button type="button" className={sidebarStyles.identity} onClick={() => setNotice('OpenDesign workspace selected.')}>
+                <span className={sidebarStyles.logo}>O</span><strong>OpenDesign</strong>
+                <ShellIcon name="chevronDown" size={12} />
+              </button>
+              <button type="button" className={`${frameStyles.iconButton} ${sidebarStyles.sidebarSearch}`} aria-label="Search" onClick={() => setNotice('Search selected in this local layout preview.')}>
+                <ShellIcon name="search" size={16} />
+              </button>
             </div>
-            <nav aria-label="Main navigation" className={styles.nav}>
+            <nav aria-label="Main navigation" className={sidebarStyles.nav}>
               {navigation.map((item) => (
                 <button
-                  type="button" key={item.label} className={styles.navItem}
+                  type="button" key={item.label} className={sidebarStyles.navItem}
                   aria-current={active === item.label ? 'page' : undefined}
                   onClick={() => setActive(item.label)}
                 >
-                  <Icon name={item.icon} size={17} aria-hidden="true" />{item.label}
+                  <ShellIcon name={item.icon} size={16} aria-hidden="true" />{item.label}
                 </button>
               ))}
             </nav>
-            <div className={styles.projects}>
-              <h3 className={styles.label}>Projects</h3>
+            <div className={sidebarStyles.projects}>
+              <h3 className={sidebarStyles.projectLabel}>Projects</h3>
               {projects.map((project) => (
                 <button
-                  type="button" key={project} className={styles.navItem}
-                  aria-current={active === project ? 'page' : undefined}
-                  onClick={() => setActive(project)}
+                  type="button" key={project.label} className={sidebarStyles.navItem}
+                  aria-current={active === project.label ? 'page' : undefined}
+                  onClick={() => setActive(project.label)}
                 >
-                  <Icon name="comment" size={16} aria-hidden="true" /><span>{project}</span>
+                  <ShellIcon name={project.icon} size={16} /><span>{project.label}</span>
                 </button>
               ))}
             </div>
-            <div className={styles.account}>
-              <span className={styles.avatar}>ZM</span>
-              <div><strong>Zach Morgan</strong><span>Personal workspace</span></div>
-              <Icon name="chevron-down" aria-hidden="true" />
+            <div className={sidebarStyles.sidebarFooter}>
+              <div className={sidebarStyles.news} data-remaining={changelog.length - newsIndex}>
+                {changelog.map((item, index) => (
+                  <article key={item.id} className={sidebarStyles.newsCard} data-position={index < newsIndex ? 'dismissed' : index === newsIndex ? 'front' : 'back'} aria-hidden={index !== newsIndex}>
+                    <div className={sidebarStyles.newsHeading}>
+                      <span>New in OpenDesign</span>
+                      <button type="button" className={sidebarStyles.dismiss} aria-label="Dismiss" tabIndex={index === newsIndex ? 0 : -1} ref={(element) => { dismissButtons.current[index] = element; }} onClick={() => {
+                        pendingFocus.current = dismissButtons.current[index + 1] ?? setupSummary.current;
+                        setNewsIndex((value) => Math.min(value + 1, changelog.length));
+                      }}>
+                        <ShellIcon name="close" size={13} />
+                      </button>
+                    </div>
+                    <strong>{item.title}</strong>
+                    <button type="button" className={sidebarStyles.changelog} tabIndex={index === newsIndex ? 0 : -1} onClick={() => setNotice('Shared folders and scheduled chats are new in OpenDesign.')}>
+                      Full changelog<ShellIcon name="chevronRight" size={13} />
+                    </button>
+                  </article>
+                ))}
+              </div>
+              <div className={sidebarStyles.setupSlot}>
+                <div className={sidebarStyles.setupCard} data-open={setupOpen}>
+                  <button type="button" className={sidebarStyles.setupSummary} ref={setupSummary} aria-expanded={setupOpen} onClick={() => {
+                    if (setupOpen && setupDetails.current?.contains(document.activeElement)) setupSummary.current?.focus({ preventScroll: true });
+                    setSetupOpen(!setupOpen);
+                  }}>
+                    <span className={sidebarStyles.setupTitle}>Getting started<ShellIcon name="chevronRight" size={13} /></span>
+                    <span className={sidebarStyles.setupSub}>{setupProgress}% done · <span>{setupProgress === 100 ? 'All done!' : setupProgress >= 60 ? 'Almost there!' : setupProgress > 0 ? 'Great start!' : "Let's go!"}</span></span>
+                  </button>
+                  <span className={sidebarStyles.progress} role="progressbar" aria-label="Getting started progress" aria-valuenow={setupProgress} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${Math.max(setupProgress, 4)}%` }} /></span>
+                  <div ref={setupDetails} className={sidebarStyles.setupDetails} aria-hidden={!setupOpen}>
+                    <div>
+                      {setup.map((group) => (
+                        <fieldset key={group.title}>
+                          <legend>{group.title}</legend>
+                          {group.tasks.map((task) => (
+                            <label key={task.id}>
+                              <input type="checkbox" tabIndex={setupOpen ? 0 : -1} checked={completed.includes(task.id)} onChange={(event) => setCompleted((items) => event.target.checked ? [...items, task.id] : items.filter((id) => id !== task.id))} />
+                              {task.label}
+                            </label>
+                          ))}
+                        </fieldset>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <button type="button" className={sidebarStyles.account} onClick={() => setNotice('Alex Morgan · Personal workspace')}>
+                <span className={sidebarStyles.avatar}>AM</span>
+                <span>Alex Morgan</span>
+                <ShellIcon name="chevronDown" size={13} />
+              </button>
             </div>
           </div>
-          {!narrow && <ResizeEdge side="sidebar" pane={{ ...sidebar, width: fitted.sidebar.width }} size={fitted.sidebar.size} onResize={(width) => dispatch({ type: 'resize', side: 'sidebar', width })} onReset={() => dispatch({ type: 'reset', side: 'sidebar' })} />}
+          {fitted && <ResizeEdge side="sidebar" pane={{ ...sidebar, width: fitted.sidebar.width }} size={fitted.sidebar.size} onResize={(width) => dispatch({ type: 'resize', side: 'sidebar', width })} onReset={() => dispatch({ type: 'reset', side: 'sidebar' })} />}
         </aside>
-        <section ref={pageElement} className={styles.page} aria-label="Conversation">
-          <div className={styles.pageHeader}>
-            <span><Icon name="comment" size={15} aria-hidden="true" /> {active}</span>
-            <span className={styles.draft}>Draft</span>
+        <section ref={pageElement} className={conversationStyles.page} aria-label="Conversation">
+          <div className={conversationStyles.pageHeader}>
+            <span><ShellIcon name="project" size={15} aria-hidden="true" /> {active === 'New chat' ? 'Website refresh' : active}</span>
+            <span className={conversationStyles.draft}>Draft</span>
           </div>
-          <div className={styles.conversation}>
-            <span className={styles.eyebrow}>A PLACE TO THINK, TOGETHER</span>
+          <div className={conversationStyles.conversation}>
+            <span className={conversationStyles.eyebrow}>A PLACE TO THINK, TOGETHER</span>
             <h2>A little more room<br />for your next idea.</h2>
-            <p className={styles.intro}>Bring your research, tools, and conversation into one focused workspace.</p>
-            <article className={styles.message} aria-label="Your message">
-              <span className={styles.messageAvatar}>ZM</span>
+            <p className={conversationStyles.intro}>Bring your research, tools, and conversation into one focused workspace.</p>
+            <article className={conversationStyles.message} aria-label="Your message">
+              <span className={conversationStyles.messageAvatar}>AM</span>
               <div>
                 <h3>You <time>10:42</time></h3>
                 <p>Let’s explore a calmer direction for our website. Something clear and considered, with space for the work to speak.</p>
               </div>
             </article>
-            <article className={styles.message} aria-label="OpenDesign message">
-              <span className={`${styles.messageAvatar} ${styles.assistantAvatar}`}>O</span>
+            <article className={conversationStyles.message} aria-label="OpenDesign message">
+              <span className={`${conversationStyles.messageAvatar} ${conversationStyles.assistantAvatar}`}>O</span>
               <div>
                 <h3>OpenDesign <time>10:42</time></h3>
                 <p>I’d start with a simpler frame, a quieter palette, and a stronger rhythm between each section.</p>
                 <p>I’ve gathered a few references in your workspace. We can keep them beside the conversation as we shape the first direction.</p>
-                <div className={styles.suggestion}>
-                  <Icon name="layers-filled" size={17} aria-hidden="true" />
+                <div className={conversationStyles.suggestion}>
+                  <ShellIcon name="file" size={17} aria-hidden="true" />
                   <span><strong>Website direction</strong><span>Layout exploration · 3 references</span></span>
-                  <Icon name="external-link" size={15} aria-hidden="true" />
+                  <ShellIcon name="arrowUpRight" size={15} aria-hidden="true" />
                 </div>
               </div>
             </article>
           </div>
           <form
-            className={styles.composer}
+            className={conversationStyles.composer}
             onSubmit={(event) => {
               event.preventDefault();
               setNotice('Preview message received.');
             }}
           >
-            <Textarea aria-label="Message OpenDesign" placeholder="What would you like to explore?" rows={2} />
+            <textarea aria-label="Message OpenDesign" placeholder="What would you like to explore?" rows={2} />
             <div>
               <span>Local design preview</span>
-              <Button type="submit" variant="primary" size="icon" aria-label="Send preview message">
-                <Icon name="arrow-up" size={16} aria-hidden="true" />
-              </Button>
+              <button type="submit" className={`${frameStyles.iconButton} ${conversationStyles.sendButton}`} aria-label="Send preview message">
+                <ShellIcon name="arrowUp" size={16} aria-hidden="true" />
+              </button>
             </div>
           </form>
         </section>
@@ -411,26 +456,26 @@ export default function AppShellWorkspaceExperiment() {
           ref={workspaceElement}
           id={paneId('workspace')}
           aria-label="Workspace"
-          className={`${styles.workspace} ${workspace.collapsed ? styles.workspaceCollapsed : ''}`}
+          className={`${frameStyles.workspace} ${workspace.collapsed ? frameStyles.workspaceCollapsed : ''}`}
           role={narrow ? 'dialog' : undefined}
           aria-modal={overlay === 'workspace' ? true : undefined}
           onKeyDown={overlay === 'workspace' ? trapFocus : undefined}
         >
-          {!narrow && <ResizeEdge side="workspace" pane={{ ...workspace, width: fitted.workspace.width }} size={fitted.workspace.size} onResize={(width) => dispatch({ type: 'resize', side: 'workspace', width })} onReset={() => dispatch({ type: 'reset', side: 'workspace' })} />}
-          <div className={styles.workspaceInner}>
-            <div className={styles.drawerHeader}>
+          {fitted && <ResizeEdge side="workspace" pane={{ ...workspace, width: fitted.workspace.width }} size={fitted.workspace.size} onResize={(width) => dispatch({ type: 'resize', side: 'workspace', width })} onReset={() => dispatch({ type: 'reset', side: 'workspace' })} />}
+          <div className={frameStyles.workspaceInner}>
+            <div className={frameStyles.drawerHeader}>
               <h2>Workspace</h2>
-              <Button ref={drawerClose} variant="ghost" size="icon" aria-label="Close workspace" onClick={closeOverlay}>
-                <Icon name="close" size={18} aria-hidden="true" />
-              </Button>
+              <button ref={drawerClose} className={frameStyles.iconButton} aria-label="Close workspace" onClick={closeOverlay}>
+                <ShellIcon name="sidebarRight" size={16} />
+              </button>
             </div>
             <WorkspacePanel onOpen={(label) => setNotice(`${label} selected in this local layout preview.`)} />
-            <p className={styles.panelHint}>Everything you need,<br />right where you’re working.</p>
+
           </div>
         </aside>
       </div>
-      <div className={`${styles.notice} accordion-collapsible ${notice ? styles.noticeOpen : ''}`} role="status">
-        <div className="accordion-collapsible-inner"><p>{notice}</p></div>
+      <div className={`${frameStyles.notice} ${notice ? frameStyles.noticeOpen : ''}`} role="status">
+        <div><p>{notice}</p></div>
       </div>
     </section>
   );
