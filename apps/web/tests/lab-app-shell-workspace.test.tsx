@@ -235,6 +235,21 @@ describe('lab app shell interactions', () => {
     expect(document.activeElement?.closest('[inert]')).toBeNull();
   });
 
+  it.each([
+    { side: 'workspace', to: 760, toggleName: 'Expand workspace' },
+    { side: 'sidebar', to: 760, toggleName: 'Collapse sidebar' },
+    { side: 'sidebar', to: 560, toggleName: 'Expand sidebar' },
+  ])('restores focus when the $side separator unmounts at $to px', ({ side, to, toggleName }) => {
+    containerWidth = 1200;
+    render(<AppShellWorkspaceExperiment />);
+    const separator = screen.getByRole('separator', { name: `Resize ${side}` });
+    separator.focus();
+    expect(document.activeElement).toBe(separator);
+    resizeContainer(to);
+    expect(document.activeElement?.getAttribute('aria-label')).toBe(toggleName);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: toggleName }));
+  });
+
   it('returns focus to the invoking toggle without pre-focusing it', () => {
     containerWidth = 760;
     render(<AppShellWorkspaceExperiment />);
