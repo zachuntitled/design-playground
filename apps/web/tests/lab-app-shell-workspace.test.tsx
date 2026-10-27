@@ -54,6 +54,22 @@ function openWorkspace() {
 }
 
 describe('lab app shell interactions', () => {
+  it('selects New design and reports the composer draft with its chosen model', () => {
+    render(<AppShellWorkspaceExperiment />, { container });
+    const navigation = within(screen.getByRole('navigation', { name: 'Main navigation' }));
+    const newDesign = navigation.getByRole('button', { name: 'New design' });
+    fireEvent.click(navigation.getByRole('button', { name: 'Folders' }));
+    fireEvent.click(newDesign);
+    expect(screen.getByLabelText('Conversation', { selector: 'section' }).textContent).toContain('Website refresh');
+    expect(navigation.queryByRole('button', { name: 'New chat' })).toBeNull();
+    const composer = within(screen.getByLabelText('Message composer', { selector: 'section' }));
+    fireEvent.click(composer.getByRole('button', { name: 'Auto' }));
+    fireEvent.click(composer.getByRole('option', { name: 'Claude' }));
+    fireEvent.change(composer.getByRole('textbox', { name: 'Message' }), { target: { value: 'Make room for ideas' } });
+    fireEvent.click(composer.getByRole('button', { name: 'Send message' }));
+    expect(screen.getByText('Preview message received with claude: Make room for ideas')).toBeTruthy();
+  });
+
   it.each([820, 560])('uses drawer geometry independently of docked fitting at %s px', (width) => {
     containerWidth = width;
     render(<AppShellWorkspaceExperiment />, { container });
@@ -179,7 +195,7 @@ describe('lab app shell interactions', () => {
   it('auto-folds the sidebar and returns focus to its toggle after narrowing', () => {
     containerWidth = 1200;
     render(<AppShellWorkspaceExperiment />, { container });
-    const newChat = screen.getByRole('button', { name: 'New chat' });
+    const newChat = screen.getByRole('button', { name: 'New design' });
     newChat.focus();
     resizeContainer(760);
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Expand sidebar' }));
@@ -281,7 +297,7 @@ describe('lab app shell interactions', () => {
 
   it.each([
     { from: 1200, to: 760, side: 'workspace', role: 'textbox', name: 'Search or enter URL' },
-    { from: 1200, to: 760, side: 'sidebar', role: 'button', name: 'New chat' },
+    { from: 1200, to: 760, side: 'sidebar', role: 'button', name: 'New design' },
   ])('returns focus before auto-folding the $side', ({ from, to, side, role, name }) => {
     containerWidth = from;
     render(<AppShellWorkspaceExperiment />, { container });

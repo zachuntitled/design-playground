@@ -33,6 +33,22 @@ function colorsOutsideTokens(sheet: postcss.Root): string[] {
 }
 
 describe('app shell dark palette', () => {
+  it.each([
+    ['--ui-cc-tray', '#161618'],
+    ['--ui-cc-card', '#262629'],
+    ['--ui-cc-ink', '#ededed'],
+    ['--ui-cc-alert', '#ff6a2b'],
+    ['--ui-cc-menu-fill', '#313135'],
+  ])('preserves the Classic composer token %s', (token, value) => {
+    const values: string[] = [];
+    for (const sheet of sheets) {
+      sheet.walkRules('.theme', (rule) => {
+        rule.walkDecls(token, (declaration) => { values.push(declaration.value); });
+      });
+    }
+    expect(values).toEqual([value]);
+  });
+
   it.each(['theme', 'labPage'])('defines the .%s rule consumed by page chrome', (className) => {
     const theme = postcss.parse(readFileSync(resolve(directory, 'theme.module.css'), 'utf8'));
     const selectors: string[] = [];
