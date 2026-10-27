@@ -16,6 +16,15 @@ import conversationStyles from './conversation.module.css';
 import panelStyles from './panel.module.css';
 import theme from './theme.module.css';
 
+function isPerceivable(element: Element) {
+  if (!element.isConnected) return false;
+  for (let ancestor: Element | null = element; ancestor; ancestor = ancestor.parentElement) {
+    const style = getComputedStyle(ancestor);
+    if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+  }
+  return true;
+}
+
 function paneId(side: PaneSide) {
   return `lab-${side}`;
 }
@@ -143,7 +152,6 @@ export default function AppShellWorkspaceExperiment() {
   const [newsIndex, setNewsIndex] = useState(0);
   const [setupOpen, setSetupOpen] = useState(false);
   const dismissButtons = useRef<(HTMLButtonElement | null)[]>([]);
-  const newsFocusPending = useRef(false);
   const setupSummary = useRef<HTMLButtonElement>(null);
   const setupDetails = useRef<HTMLDivElement>(null);
   const [completed, setCompleted] = useState(() => setup.flatMap((group) => group.tasks.filter((task) => task.done).map((task) => task.id)));
@@ -154,7 +162,7 @@ export default function AppShellWorkspaceExperiment() {
   const workspaceToggle = useRef<HTMLButtonElement>(null);
   const drawerClose = useRef<HTMLButtonElement>(null);
   const sidebarClose = useRef<HTMLButtonElement>(null);
-  const overlayFocus = useRef<HTMLButtonElement | null>(null);
+  const pendingFocus = useRef<HTMLButtonElement | null>(null);
   const measuredMode = useRef(initialPanes.mode);
   const modeChangeFocus = useRef<{ side: PaneSide; element: Element } | null>(null);
   const shell = useRef<HTMLElement>(null);
@@ -197,25 +205,27 @@ export default function AppShellWorkspaceExperiment() {
     for (const side of ['sidebar', 'workspace'] as const) {
       const element = (side === 'sidebar' ? sidebarElement : workspaceElement).current;
       if ((panes[side].collapsed && element?.contains(document.activeElement))
-        || (priorFocus?.side === side && (panes[side].collapsed || !priorFocus.element.isConnected || priorFocus.element.closest('[hidden]')))) {
+        || (priorFocus?.side === side && (panes[side].collapsed || !isPerceivable(priorFocus.element)))) {
         (side === 'sidebar' ? sidebarToggle : workspaceToggle).current?.focus({ preventScroll: true });
       }
       element?.toggleAttribute('inert', !!panes[side].collapsed || (overlay !== null && overlay !== side));
     }
     pageElement.current?.toggleAttribute('inert', overlay !== null);
-    overlayFocus.current?.focus({ preventScroll: true });
-    overlayFocus.current = null;
-  }, [panes, overlay]);
-
-  useLayoutEffect(() => {
-    if (!newsFocusPending.current) return;
-    newsFocusPending.current = false;
-    (dismissButtons.current[newsIndex] ?? setupSummary.current)?.focus({ preventScroll: true });
-  }, [newsIndex]);
+    const target = pendingFocus.current;
+    pendingFocus.current = null;
+    let frame = 0;
+    function focusWhenVisible() {
+      if (!target?.isConnected || target.closest('[inert]')) return;
+      if (isPerceivable(target)) target.focus({ preventScroll: true });
+      else frame = requestAnimationFrame(focusWhenVisible);
+    }
+    focusWhenVisible();
+    return () => cancelAnimationFrame(frame);
+  }, [panes, overlay, newsIndex]);
 
   function togglePane(side: PaneSide) {
     if (narrow) {
-      overlayFocus.current = panes[side].collapsed
+      pendingFocus.current = panes[side].collapsed
         ? (side === 'sidebar' ? sidebarClose : drawerClose).current
         : (side === 'sidebar' ? sidebarToggle : workspaceToggle).current;
     }
@@ -224,7 +234,7 @@ export default function AppShellWorkspaceExperiment() {
 
   function closeOverlay() {
     if (!overlay) return;
-    overlayFocus.current = (overlay === 'sidebar' ? sidebarToggle : workspaceToggle).current;
+    pendingFocus.current = (overlay === 'sidebar' ? sidebarToggle : workspaceToggle).current;
     dispatch({ type: 'close', side: overlay });
   }
 
@@ -232,14 +242,8 @@ export default function AppShellWorkspaceExperiment() {
     if (event.key !== 'Tab') return;
     const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
       'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"]), [contenteditable]',
-    )).filter((element) => {
-      if (element.matches(':disabled, [tabindex="-1"], input[type="hidden"], [contenteditable="false"]') || element.closest('[hidden], [inert]')) return false;
-      for (let ancestor: HTMLElement | null = element; ancestor; ancestor = ancestor.parentElement) {
-        const style = getComputedStyle(ancestor);
-        if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') return false;
-      }
-      return true;
-    });
+    )).filter((element) => !element.matches(':disabled, [tabindex="-1"], input[type="hidden"], [contenteditable="false"]')
+      && !element.closest('[inert]') && isPerceivable(element));
     const first = controls[0];
     const last = controls[controls.length - 1];
     if (event.shiftKey && document.activeElement === first) {
@@ -315,7 +319,7 @@ export default function AppShellWorkspaceExperiment() {
           <div className={frameStyles.sidebarInner}>
             <div className={frameStyles.sidebarDrawerHeader}>
               <h2>Sidebar</h2>
-              <button ref={sidebarClose} hidden={!narrow} className={frameStyles.iconButton} aria-label="Close sidebar" onClick={closeOverlay}>
+              <button ref={sidebarClose} className={frameStyles.iconButton} aria-label="Close sidebar" onClick={closeOverlay}>
                 <ShellIcon name="sidebarLeft" size={16} />
               </button>
             </div>
@@ -358,7 +362,7 @@ export default function AppShellWorkspaceExperiment() {
                     <div className={sidebarStyles.newsHeading}>
                       <span>New in OpenDesign</span>
                       <button type="button" className={sidebarStyles.dismiss} aria-label="Dismiss" tabIndex={index === newsIndex ? 0 : -1} ref={(element) => { dismissButtons.current[index] = element; }} onClick={() => {
-                        newsFocusPending.current = true;
+                        pendingFocus.current = dismissButtons.current[index + 1] ?? setupSummary.current;
                         setNewsIndex((value) => Math.min(value + 1, changelog.length));
                       }}>
                         <ShellIcon name="close" size={13} />
@@ -466,7 +470,7 @@ export default function AppShellWorkspaceExperiment() {
           <div className={frameStyles.workspaceInner}>
             <div className={frameStyles.drawerHeader}>
               <h2>Workspace</h2>
-              <button ref={drawerClose} hidden={!narrow} className={frameStyles.iconButton} aria-label="Close workspace" onClick={closeOverlay}>
+              <button ref={drawerClose} className={frameStyles.iconButton} aria-label="Close workspace" onClick={closeOverlay}>
                 <ShellIcon name="sidebarRight" size={16} />
               </button>
             </div>

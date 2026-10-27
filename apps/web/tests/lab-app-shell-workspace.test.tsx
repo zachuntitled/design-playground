@@ -17,6 +17,11 @@ beforeEach(() => {
   const computedStyle = window.getComputedStyle;
   vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
     const style = computedStyle(element);
+    const docked = element.closest('[data-mode]')?.getAttribute('data-mode') === 'docked';
+    if (docked && (element === document.querySelector('[aria-label="Close sidebar"]')?.parentElement
+      || element.matches('[aria-label="Close workspace"]'))) {
+      Object.defineProperty(style, 'display', { value: 'none' });
+    }
     Object.defineProperties(style, { borderLeftWidth: { value: '0px' }, borderRightWidth: { value: '0px' } });
     return style;
   });
@@ -386,6 +391,17 @@ describe('lab app shell interactions', () => {
     resizeContainer(1200);
     expect(document.activeElement).toBe(project);
     expect(project.closest('[inert]')).toBeNull();
+  });
+
+  it.each(['display', 'visibility'] as const)('restores focus when a docked control has a hidden ancestor via %s', (property) => {
+    containerWidth = 760;
+    render(<AppShellWorkspaceExperiment />);
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }));
+    const project = screen.getByRole('button', { name: 'Website refresh' });
+    project.focus();
+    project.parentElement!.style[property] = property === 'display' ? 'none' : 'hidden';
+    resizeContainer(1200);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Collapse sidebar' }));
   });
 
   it('shows setup progress and preserves completed tasks across collapse', () => {
