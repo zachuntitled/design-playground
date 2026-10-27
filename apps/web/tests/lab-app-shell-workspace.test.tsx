@@ -155,6 +155,27 @@ describe('lab app shell interactions', () => {
     expect(screen.getByRole('complementary', { name: 'Workspace' }).hasAttribute('aria-modal')).toBe(false);
   });
 
+  it('keeps focus on New chat when the sidebar stays docked after narrowing', () => {
+    containerWidth = 1200;
+    render(<AppShellWorkspaceExperiment />);
+    const newChat = screen.getByRole('button', { name: 'New chat' });
+    newChat.focus();
+    resizeContainer(760);
+    expect(document.activeElement).toBe(newChat);
+    expect(screen.getByRole('complementary', { name: 'Sidebar' }).hasAttribute('inert')).toBe(false);
+  });
+
+  it('restores sidebar toggle focus when the compact overlay becomes docked', () => {
+    containerWidth = 560;
+    render(<AppShellWorkspaceExperiment />);
+    const toggle = screen.getByRole('button', { name: 'Expand sidebar' });
+    fireEvent.click(toggle);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close sidebar' }));
+    resizeContainer(1200);
+    expect(document.activeElement).toBe(toggle);
+    expect(screen.getByRole('complementary', { name: 'Sidebar' }).hasAttribute('aria-modal')).toBe(false);
+  });
+
   it('announces workspace actions outside inert content', () => {
     containerWidth = 760;
     render(<AppShellWorkspaceExperiment />);
