@@ -13,11 +13,11 @@ export const labExperiments: readonly LabExperiment[] = [
     title: 'App shell workspace',
     description: 'An inset app frame with a resizable sidebar, conversation, and folding workspace.',
     load: async () => {
-      const [{ default: Experiment }, { default: theme }] = await Promise.all([
+      const [{ default: Experiment }, { pageChrome }] = await Promise.all([
         import('./app-shell-workspace'),
-        import('./app-shell-workspace/theme.module.css'),
+        import('./app-shell-workspace/page-chrome'),
       ]);
-      return { default: Experiment, page: { className: `${theme.theme} ${theme.labPage}`, compactHeader: true } };
+      return { default: Experiment, page: pageChrome };
     },
   },
   {

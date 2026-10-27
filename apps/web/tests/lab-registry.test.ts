@@ -23,6 +23,8 @@ describe('lab registry', () => {
     const workspace = await labExperiments.find((entry) => entry.slug === 'app-shell-workspace')!.load();
     const sample = await labExperiments.find((entry) => entry.slug === 'sample')!.load();
     expect(workspace.page).toEqual({ className: expect.any(String), compactHeader: true });
+    expect(workspace.page!.className.trim()).not.toBe('');
+    expect(workspace.page!.className).not.toContain('undefined');
     expect(sample.page).toBeUndefined();
   });
 

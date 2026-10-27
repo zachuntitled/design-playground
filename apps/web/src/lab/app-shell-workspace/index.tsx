@@ -14,7 +14,7 @@ import frameStyles from './frame.module.css';
 import sidebarStyles from './sidebar.module.css';
 import conversationStyles from './conversation.module.css';
 import panelStyles from './panel.module.css';
-import theme from './theme.module.css';
+import { themeClassName } from './page-chrome';
 
 function isPerceivable(element: Element) {
   if (!element.isConnected) return false;
@@ -258,7 +258,7 @@ export default function AppShellWorkspaceExperiment() {
   return (
     <section
       ref={shell}
-      className={`${theme.theme} ${frameStyles.shell}`}
+      className={`${themeClassName} ${frameStyles.shell}`}
       aria-label="App shell workspace experiment"
       data-mode={mode}
       data-sidebar-collapsed={!!sidebar.collapsed}
