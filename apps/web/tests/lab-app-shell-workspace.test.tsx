@@ -155,14 +155,15 @@ describe('lab app shell interactions', () => {
     expect(screen.getByRole('complementary', { name: 'Workspace' }).hasAttribute('aria-modal')).toBe(false);
   });
 
-  it('keeps focus on New chat when the sidebar stays docked after narrowing', () => {
+  it('auto-folds the sidebar and returns focus to its toggle after narrowing', () => {
     containerWidth = 1200;
     render(<AppShellWorkspaceExperiment />);
     const newChat = screen.getByRole('button', { name: 'New chat' });
     newChat.focus();
     resizeContainer(760);
-    expect(document.activeElement).toBe(newChat);
-    expect(screen.getByRole('complementary', { name: 'Sidebar' }).hasAttribute('inert')).toBe(false);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Expand sidebar' }));
+    expect(screen.getByRole('dialog', { name: 'Sidebar' }).hasAttribute('inert')).toBe(true);
+    expect(screen.getByRole('dialog', { name: 'Workspace' }).hasAttribute('inert')).toBe(true);
   });
 
   it('restores sidebar toggle focus when the compact overlay becomes docked', () => {
@@ -197,8 +198,8 @@ describe('lab app shell interactions', () => {
     expect(shell.dataset.mode).toBe('compact');
   });
 
-  it('makes the compact sidebar modal on user open and restores focus on close', () => {
-    containerWidth = 560;
+  it.each([760, 560])('makes the sidebar modal at %s px and restores focus on close', (width) => {
+    containerWidth = width;
     render(<AppShellWorkspaceExperiment />);
     const toggle = screen.getByRole('button', { name: 'Expand sidebar' });
     toggle.focus();
@@ -210,6 +211,19 @@ describe('lab app shell interactions', () => {
     expect(document.activeElement).toBe(toggle);
     expect(screen.getByRole('region', { name: 'Conversation' }).hasAttribute('inert')).toBe(false);
   });
+  it('keeps an open sidebar and its focus when crossing the spacing breakpoint', () => {
+    containerWidth = 760;
+    render(<AppShellWorkspaceExperiment />);
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }));
+    const close = screen.getByRole('button', { name: 'Close sidebar' });
+    resizeContainer(560);
+    expect(document.activeElement).toBe(close);
+    expect(screen.getByRole('dialog', { name: 'Sidebar' }).hasAttribute('inert')).toBe(false);
+    expect(screen.getByRole('region', { name: 'Conversation' }).hasAttribute('inert')).toBe(true);
+    resizeContainer(760);
+    expect(document.activeElement).toBe(close);
+  });
+
   it('restores the workspace after a sidebar round trip through its constrained maximum', () => {
     containerWidth = 918;
     render(<AppShellWorkspaceExperiment />);
@@ -246,7 +260,7 @@ describe('lab app shell interactions', () => {
 
   it.each([
     { from: 1200, to: 760, side: 'workspace', role: 'textbox', name: 'Search or enter URL' },
-    { from: 760, to: 560, side: 'sidebar', role: 'button', name: 'New chat' },
+    { from: 1200, to: 760, side: 'sidebar', role: 'button', name: 'New chat' },
   ])('returns focus before auto-folding the $side', ({ from, to, side, role, name }) => {
     containerWidth = from;
     render(<AppShellWorkspaceExperiment />);
@@ -258,7 +272,7 @@ describe('lab app shell interactions', () => {
 
   it.each([
     { side: 'workspace', to: 760, toggleName: 'Expand workspace' },
-    { side: 'sidebar', to: 760, toggleName: 'Collapse sidebar' },
+    { side: 'sidebar', to: 760, toggleName: 'Expand sidebar' },
     { side: 'sidebar', to: 560, toggleName: 'Expand sidebar' },
   ])('restores focus when the $side separator unmounts at $to px', ({ side, to, toggleName }) => {
     containerWidth = 1200;
@@ -283,7 +297,7 @@ describe('lab app shell interactions', () => {
 
   it.each(['sidebar', 'workspace'] as const)('reopens auto-folded %s but preserves user folds', (side) => {
     render(<AppShellWorkspaceExperiment />);
-    resizeContainer(side === 'sidebar' ? 560 : 880);
+    resizeContainer(760);
     expect(screen.getByRole('button', { name: `Expand ${side}` }).getAttribute('aria-expanded')).toBe('false');
     resizeContainer(1400);
     const toggle = screen.getByRole('button', { name: `Collapse ${side}` });

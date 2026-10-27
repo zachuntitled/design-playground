@@ -66,6 +66,13 @@
   --scrim: rgba(0, 0, 0, 0.55);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sidebar-drawer-width: 264px;
+  --workspace-drawer-width: 360px;
+  --drawer-clearance: 56px;
+  --drawer-radius: 18px;
+  --drawer-enter: 420ms;
+  --drawer-exit: 380ms;
+  --scrim-duration: 300ms;
   --radius-panel: 12px;
   --frame-gap: 8px;
   color-scheme: dark;
@@ -1107,13 +1114,13 @@
   position: absolute;
   z-index: 6;
   inset: 0 0 0 auto;
-  width: var(--workspace-width);
-  border-radius: 18px 0 0 18px;
+  width: min(var(--workspace-drawer-width), calc(100% - var(--drawer-clearance)));
+  border-radius: var(--drawer-radius) 0 0 var(--drawer-radius);
   background: var(--page);
   box-shadow: 0 0 0 1px var(--line), var(--drawer-shadow);
   opacity: 1;
   translate: 0 0;
-  transition: translate 420ms var(--ease), visibility 0s;
+  transition: translate var(--drawer-enter) var(--ease), visibility 0s;
 }
 
 .shell:not([data-mode="docked"]) .workspaceInner {
@@ -1123,7 +1130,7 @@
 .shell:not([data-mode="docked"]) .workspaceCollapsed {
   translate: calc(100% + 24px) 0;
   visibility: hidden;
-  transition: translate 380ms var(--ease), visibility 0s 380ms;
+  transition: translate var(--drawer-exit) var(--ease), visibility 0s var(--drawer-exit);
 }
 
 .shell:not([data-mode="docked"]) .drawerHeader .iconButton {
@@ -1131,7 +1138,21 @@
 }
 
 .shell:not([data-mode="docked"]) .page {
-  margin-right: var(--frame-gap);
+  margin-inline: var(--frame-gap);
+}
+
+.shell:not([data-mode="docked"]) .sidebarToggle {
+  left: calc(var(--frame-gap) + 9px);
+  top: calc(var(--frame-gap) + 9px);
+}
+
+.shell:not([data-mode="docked"]) .workspaceToggle {
+  right: calc(var(--frame-gap) + 9px);
+  top: calc(var(--frame-gap) + 9px);
+}
+
+.shell:not([data-mode="docked"]) .pageHeader {
+  padding-inline: 48px;
 }
 
 .shell:not([data-mode="docked"]) .conversation {
@@ -1152,40 +1173,40 @@
   background: var(--scrim);
   opacity: 1;
   visibility: visible;
-  transition: opacity 300ms ease, visibility 0s;
+  transition: opacity var(--scrim-duration) ease, visibility 0s;
 }
 
 .shell:not([data-mode="docked"]) .scrimHidden {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: opacity 300ms ease, visibility 0s 300ms;
+  transition: opacity var(--scrim-duration) ease, visibility 0s var(--scrim-duration);
 }
 
-.shell[data-mode="compact"] .sidebar {
+.shell:not([data-mode="docked"]) .sidebar {
   position: absolute;
   z-index: 6;
   inset: 0 auto 0 0;
-  width: var(--sidebar-width);
-  border-radius: 0 18px 18px 0;
+  width: min(var(--sidebar-drawer-width), calc(100% - var(--drawer-clearance)));
+  border-radius: 0 var(--drawer-radius) var(--drawer-radius) 0;
   background: var(--page);
   box-shadow: 0 0 0 1px var(--line), var(--drawer-shadow);
   opacity: 1;
   translate: 0 0;
-  transition: translate 420ms var(--ease), visibility 0s;
+  transition: translate var(--drawer-enter) var(--ease), visibility 0s;
 }
 
-.shell[data-mode="compact"] .sidebarCollapsed {
+.shell:not([data-mode="docked"]) .sidebarCollapsed {
   translate: calc(-100% - 24px) 0;
   visibility: hidden;
-  transition: translate 380ms var(--ease), visibility 0s 380ms;
+  transition: translate var(--drawer-exit) var(--ease), visibility 0s var(--drawer-exit);
 }
 
-.shell[data-mode="compact"] .sidebarInner {
+.shell:not([data-mode="docked"]) .sidebarInner {
   padding: 10px 10px 10px 12px;
 }
 
-.shell[data-mode="compact"] .sidebarDrawerHeader {
+.shell:not([data-mode="docked"]) .sidebarDrawerHeader {
   position: absolute;
   display: block;
   top: 10px;

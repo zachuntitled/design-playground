@@ -21,8 +21,8 @@ export const initialPanes: ShellState = {
   mode: 'docked',
 };
 
-export function isOverlay(side: PaneSide, mode: ShellMode): boolean {
-  return side === 'sidebar' ? mode === 'compact' : mode !== 'docked';
+export function isOverlay(mode: ShellMode): boolean {
+  return mode !== 'docked';
 }
 
 export function paneReducer(state: ShellState, action: PaneAction): ShellState {
@@ -30,10 +30,10 @@ export function paneReducer(state: ShellState, action: PaneAction): ShellState {
     if (action.mode === state.mode) return state;
     const transition = (side: PaneSide): PaneState => {
       const pane = state[side];
-      if (isOverlay(side, action.mode) && !isOverlay(side, state.mode) && !pane.collapsed) {
+      if (isOverlay(action.mode) && !isOverlay(state.mode) && !pane.collapsed) {
         return { ...pane, collapsed: 'auto' };
       }
-      if (!isOverlay(side, action.mode) && pane.collapsed === 'auto') {
+      if (!isOverlay(action.mode) && pane.collapsed === 'auto') {
         return { ...pane, collapsed: false };
       }
       return pane;
@@ -53,7 +53,7 @@ export function paneReducer(state: ShellState, action: PaneAction): ShellState {
   return {
     ...state,
     [side]: { ...pane, collapsed },
-    [otherSide]: !collapsed && isOverlay(side, state.mode) && isOverlay(otherSide, state.mode) && !other.collapsed
+    [otherSide]: !collapsed && isOverlay(state.mode) && !other.collapsed
       ? { ...other, collapsed: 'auto' } : other,
   };
 }

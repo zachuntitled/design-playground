@@ -154,10 +154,10 @@ export default function AppShellWorkspaceExperiment() {
   const workspaceElement = useRef<HTMLElement>(null);
   const pageElement = useRef<HTMLElement>(null);
   const [containerWidth, setContainerWidth] = useState(1440);
-  const narrow = mode !== 'docked';
+  const narrow = isOverlay(mode);
   const overlay = narrow && !workspace.collapsed ? 'workspace'
-    : mode === 'compact' && !sidebar.collapsed ? 'sidebar' : null;
-  const fitted = fitPanes(containerWidth, mode, sidebar, workspace, panes.lastResized);
+    : narrow && !sidebar.collapsed ? 'sidebar' : null;
+  const fitted = fitPanes(containerWidth, sidebar, workspace, panes.lastResized);
 
   useLayoutEffect(() => {
     const element = shell.current;
@@ -207,7 +207,7 @@ export default function AppShellWorkspaceExperiment() {
   }, [panes, overlay]);
 
   function togglePane(side: PaneSide, invoker: HTMLElement) {
-    if (panes[side].collapsed && isOverlay(side, mode)) {
+    if (panes[side].collapsed && isOverlay(mode)) {
       const fallback = (side === 'sidebar' ? sidebarToggle : workspaceToggle).current!;
       const element = invoker.matches('button:not(:disabled), a[href], input:not(:disabled), [tabindex]:not([tabindex="-1"])')
         ? invoker : fallback;
@@ -297,7 +297,7 @@ export default function AppShellWorkspaceExperiment() {
           ref={sidebarElement}
           id={paneId('sidebar')}
           aria-label="Sidebar"
-          role={mode === 'compact' ? 'dialog' : undefined}
+          role={narrow ? 'dialog' : undefined}
           aria-modal={overlay === 'sidebar' ? true : undefined}
           onKeyDown={overlay === 'sidebar' ? trapFocus : undefined}
           className={`${styles.sidebar} ${sidebar.collapsed ? styles.sidebarCollapsed : ''}`}
