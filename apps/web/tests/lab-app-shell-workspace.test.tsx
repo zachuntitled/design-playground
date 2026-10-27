@@ -334,6 +334,50 @@ describe('lab app shell interactions', () => {
     expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull();
   });
 
+  it('moves focus to the next changelog dismiss button and then the setup summary', () => {
+    containerWidth = 760;
+    render(<AppShellWorkspaceExperiment />);
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }));
+    const first = screen.getByRole('button', { name: 'Dismiss' });
+    first.focus();
+    fireEvent.click(first);
+    const next = screen.getByRole('button', { name: 'Dismiss' });
+    expect(document.activeElement).toBe(next);
+    fireEvent.click(next);
+    const summary = screen.getByRole('button', { name: /Getting started/ });
+    expect(document.activeElement).toBe(summary);
+    fireEvent.keyDown(summary, { key: 'Escape' });
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Expand sidebar' }));
+  });
+
+  it('returns checklist focus to the summary before collapsing setup', () => {
+    render(<AppShellWorkspaceExperiment />);
+    const summary = screen.getByRole('button', { name: /Getting started/ });
+    fireEvent.click(summary);
+    screen.getByRole('checkbox', { name: 'Invite your teammates' }).focus();
+    fireEvent.click(summary);
+    expect(document.activeElement).toBe(summary);
+    expect(summary.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('exposes setup progress outside the summary button with a named percentage', () => {
+    render(<AppShellWorkspaceExperiment />);
+    const progress = screen.getByRole('progressbar', { name: 'Getting started progress' });
+    expect(progress.closest('button')).toBeNull();
+    expect(screen.getByRole('button', { name: /Getting started.*13% done/ })).toBeTruthy();
+  });
+
+  it('keeps focus on a visible project when the sidebar drawer becomes docked', () => {
+    containerWidth = 760;
+    render(<AppShellWorkspaceExperiment />);
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }));
+    const project = screen.getByRole('button', { name: 'Website refresh' });
+    project.focus();
+    resizeContainer(1200);
+    expect(document.activeElement).toBe(project);
+    expect(project.closest('[inert]')).toBeNull();
+  });
+
   it('shows setup progress and preserves completed tasks across collapse', () => {
     render(<AppShellWorkspaceExperiment />);
     const summary = screen.getByRole('button', { name: /Getting started/ });

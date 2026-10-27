@@ -138,6 +138,10 @@ export default function AppShellWorkspaceExperiment() {
   const [active, setActive] = useState('New chat');
   const [newsIndex, setNewsIndex] = useState(0);
   const [setupOpen, setSetupOpen] = useState(false);
+  const dismissButtons = useRef<(HTMLButtonElement | null)[]>([]);
+  const newsFocusPending = useRef(false);
+  const setupSummary = useRef<HTMLButtonElement>(null);
+  const setupDetails = useRef<HTMLDivElement>(null);
   const [completed, setCompleted] = useState(() => setup.flatMap((group) => group.tasks.filter((task) => task.done).map((task) => task.id)));
   const setupProgress = Math.round(completed.length / setup.reduce((count, group) => count + group.tasks.length, 0) * 100);
   const [notice, setNotice] = useState('');
@@ -146,7 +150,7 @@ export default function AppShellWorkspaceExperiment() {
   const workspaceToggle = useRef<HTMLButtonElement>(null);
   const drawerClose = useRef<HTMLButtonElement>(null);
   const sidebarClose = useRef<HTMLButtonElement>(null);
-  const overlayFocus = useRef<{ side: PaneSide; element: HTMLElement; pending: boolean } | null>(null);
+  const overlayFocus = useRef<HTMLButtonElement | null>(null);
   const measuredMode = useRef(initialPanes.mode);
   const modeChangeFocus = useRef<{ side: PaneSide; element: Element } | null>(null);
   const shell = useRef<HTMLElement>(null);
@@ -189,35 +193,35 @@ export default function AppShellWorkspaceExperiment() {
     for (const side of ['sidebar', 'workspace'] as const) {
       const element = (side === 'sidebar' ? sidebarElement : workspaceElement).current;
       if ((panes[side].collapsed && element?.contains(document.activeElement))
-        || (priorFocus?.side === side && (panes[side].collapsed || !priorFocus.element.isConnected))) {
+        || (priorFocus?.side === side && (panes[side].collapsed || !priorFocus.element.isConnected || priorFocus.element.closest('[hidden]')))) {
         (side === 'sidebar' ? sidebarToggle : workspaceToggle).current?.focus({ preventScroll: true });
       }
       element?.toggleAttribute('inert', !!panes[side].collapsed || (overlay !== null && overlay !== side));
     }
     pageElement.current?.toggleAttribute('inert', overlay !== null);
-    const focus = overlayFocus.current;
-    if (!focus) return;
-    if (focus.side !== overlay) {
-      focus.element.focus({ preventScroll: true });
-      overlayFocus.current = null;
-    } else if (focus.pending) {
-      (overlay === 'workspace' ? drawerClose : sidebarClose).current?.focus({ preventScroll: true });
-      focus.pending = false;
-    }
+    overlayFocus.current?.focus({ preventScroll: true });
+    overlayFocus.current = null;
   }, [panes, overlay]);
 
-  function togglePane(side: PaneSide, invoker: HTMLElement) {
-    if (panes[side].collapsed && isOverlay(mode)) {
-      const fallback = (side === 'sidebar' ? sidebarToggle : workspaceToggle).current!;
-      const element = invoker.matches('button:not(:disabled), a[href], input:not(:disabled), [tabindex]:not([tabindex="-1"])')
-        ? invoker : fallback;
-      overlayFocus.current = { side, element, pending: true };
+  useLayoutEffect(() => {
+    if (!newsFocusPending.current) return;
+    newsFocusPending.current = false;
+    (dismissButtons.current[newsIndex] ?? setupSummary.current)?.focus({ preventScroll: true });
+  }, [newsIndex]);
+
+  function togglePane(side: PaneSide) {
+    if (narrow) {
+      overlayFocus.current = panes[side].collapsed
+        ? (side === 'sidebar' ? sidebarClose : drawerClose).current
+        : (side === 'sidebar' ? sidebarToggle : workspaceToggle).current;
     }
     dispatch({ type: 'toggle', side });
   }
 
   function closeOverlay() {
-    if (overlay) dispatch({ type: 'close', side: overlay });
+    if (!overlay) return;
+    overlayFocus.current = (overlay === 'sidebar' ? sidebarToggle : workspaceToggle).current;
+    dispatch({ type: 'close', side: overlay });
   }
 
   function trapFocus(event: KeyboardEvent<HTMLElement>) {
@@ -267,7 +271,7 @@ export default function AppShellWorkspaceExperiment() {
           ref={sidebarToggle}
           aria-controls={paneId('sidebar')}
           aria-expanded={!sidebar.collapsed}
-          onClick={(event) => togglePane('sidebar', event.currentTarget)}
+          onClick={() => togglePane('sidebar')}
         >
           <ShellIcon name="sidebarLeft" size={16} aria-hidden="true" />
         </button>
@@ -279,7 +283,7 @@ export default function AppShellWorkspaceExperiment() {
             ref={workspaceToggle}
             aria-controls={paneId('workspace')}
             aria-expanded={!workspace.collapsed}
-            onClick={(event) => togglePane('workspace', event.currentTarget)}
+            onClick={() => togglePane('workspace')}
           >
             <ShellIcon name="sidebarRight" size={16} aria-hidden="true" />
           </button>
@@ -305,7 +309,7 @@ export default function AppShellWorkspaceExperiment() {
           <div className={styles.sidebarInner}>
             <div className={styles.sidebarDrawerHeader}>
               <h2>Sidebar</h2>
-              <button ref={sidebarClose} className={styles.iconButton} aria-label="Close sidebar" onClick={closeOverlay}>
+              <button ref={sidebarClose} hidden={!narrow} className={styles.iconButton} aria-label="Close sidebar" onClick={closeOverlay}>
                 <ShellIcon name="sidebarLeft" size={16} />
               </button>
             </div>
@@ -347,7 +351,10 @@ export default function AppShellWorkspaceExperiment() {
                   <article key={item.id} className={styles.newsCard} data-position={index < newsIndex ? 'dismissed' : index === newsIndex ? 'front' : 'back'} aria-hidden={index !== newsIndex}>
                     <div className={styles.newsHeading}>
                       <span>New in OpenDesign</span>
-                      <button type="button" className={styles.dismiss} aria-label="Dismiss" tabIndex={index === newsIndex ? 0 : -1} onClick={() => setNewsIndex((value) => Math.min(value + 1, changelog.length))}>
+                      <button type="button" className={styles.dismiss} aria-label="Dismiss" tabIndex={index === newsIndex ? 0 : -1} ref={(element) => { dismissButtons.current[index] = element; }} onClick={() => {
+                        newsFocusPending.current = true;
+                        setNewsIndex((value) => Math.min(value + 1, changelog.length));
+                      }}>
                         <ShellIcon name="close" size={13} />
                       </button>
                     </div>
@@ -360,12 +367,15 @@ export default function AppShellWorkspaceExperiment() {
               </div>
               <div className={styles.setupSlot}>
                 <div className={styles.setupCard} data-open={setupOpen}>
-                  <button type="button" className={styles.setupSummary} aria-expanded={setupOpen} onClick={() => setSetupOpen(!setupOpen)}>
+                  <button type="button" className={styles.setupSummary} ref={setupSummary} aria-expanded={setupOpen} onClick={() => {
+                    if (setupOpen && setupDetails.current?.contains(document.activeElement)) setupSummary.current?.focus({ preventScroll: true });
+                    setSetupOpen(!setupOpen);
+                  }}>
                     <span className={styles.setupTitle}>Getting started<ShellIcon name="chevronRight" size={13} /></span>
                     <span className={styles.setupSub}>{setupProgress}% done · <span>{setupProgress === 100 ? 'All done!' : setupProgress >= 60 ? 'Almost there!' : setupProgress > 0 ? 'Great start!' : "Let's go!"}</span></span>
-                    <span className={styles.progress} role="progressbar" aria-label="Getting started progress" aria-valuenow={setupProgress} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${Math.max(setupProgress, 4)}%` }} /></span>
                   </button>
-                  <div className={styles.setupDetails} aria-hidden={!setupOpen}>
+                  <span className={styles.progress} role="progressbar" aria-label="Getting started progress" aria-valuenow={setupProgress} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${Math.max(setupProgress, 4)}%` }} /></span>
+                  <div ref={setupDetails} className={styles.setupDetails} aria-hidden={!setupOpen}>
                     <div>
                       {setup.map((group) => (
                         <fieldset key={group.title}>
@@ -450,7 +460,7 @@ export default function AppShellWorkspaceExperiment() {
           <div className={styles.workspaceInner}>
             <div className={styles.drawerHeader}>
               <h2>Workspace</h2>
-              <button ref={drawerClose} className={styles.iconButton} aria-label="Close workspace" onClick={closeOverlay}>
+              <button ref={drawerClose} hidden={!narrow} className={styles.iconButton} aria-label="Close workspace" onClick={closeOverlay}>
                 <ShellIcon name="sidebarRight" size={16} />
               </button>
             </div>
