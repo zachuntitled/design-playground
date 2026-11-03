@@ -31,6 +31,25 @@
 }
 
 .theme {
+  --ui-cc-tray: #161618;
+  --ui-cc-card: #262629;
+  --ui-cc-line: rgba(255, 255, 255, 0.08);
+  --ui-cc-ink: #ededed;
+  --ui-cc-ink-muted: #8f8f8f;
+  --ui-cc-ink-hover: #c4c4c4;
+  --ui-cc-ink-faint: #6b6b70;
+  --ui-cc-placeholder: #5f5f64;
+  --ui-cc-ink-shine: rgba(255, 255, 255, 0.95);
+  --ui-cc-alert: #ff6a2b;
+  --ui-cc-alert-wash: rgba(244, 73, 0, 0.16);
+  --ui-cc-on-ink: #121213;
+  --ui-cc-menu-fill: #313135;
+  --ui-cc-square-hover: #2e2e32;
+  --ui-cc-shadow: rgba(0, 0, 0, 0.4);
+  --ui-cc-focus: rgba(255, 255, 255, 0.3);
+  --ui-cc-hover-filter: brightness(1.5);
+  --ui-cc-menu-shadow: rgba(0, 0, 0, 0.45);
+  --ui-cc-menu-shadow-near: rgba(0, 0, 0, 0.35);
   --tray: #1d1d20;
   --card: #1b1b1e;
   --page: #0e0e10;

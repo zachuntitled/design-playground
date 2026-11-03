@@ -157,52 +157,6 @@
   color: var(--muted);
 }
 
-.composer {
-  flex: none;
-  margin: auto 24px 16px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--card);
-}
-
-.composer textarea {
-  width: 100%;
-  min-height: 44px;
-  padding: 4px;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  resize: vertical;
-  font: inherit;
-  color: var(--ink);
-}
-
-.composer textarea::placeholder {
-  color: var(--placeholder);
-}
-
-.composer > div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.composer > div > span {
-  font-size: 10px;
-  color: var(--muted);
-}
-
-.composer .sendButton {
-  background: var(--button);
-  color: var(--on-ink);
-}
-
-.composer .sendButton:hover {
-  background: var(--button-hover);
-  color: var(--on-ink);
-}
-
 :where([data-mode]):not([data-mode="docked"]) .page {
   margin-inline: var(--frame-gap);
 }
@@ -215,9 +169,6 @@
   padding: 24px 18px 16px;
 }
 
-:where([data-mode]):not([data-mode="docked"]) .composer {
-  margin-inline: 16px;
-}
 
 [data-mode="compact"] .page {
   margin: 6px;

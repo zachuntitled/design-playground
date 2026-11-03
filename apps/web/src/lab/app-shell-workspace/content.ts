@@ -7,7 +7,7 @@ type NewsItem = Readonly<{ id: string; title: string }>;
 type SetupGroup = Readonly<{ title: string; tasks: ReadonlyArray<{ id: string; label: string; done: boolean }> }>;
 
 export const navigation: readonly NavigationItem[] = [
-  { label: 'New chat', icon: 'newChat' },
+  { label: 'New design', icon: 'newChat' },
   { label: 'Folders', icon: 'folders' },
   { label: 'Integrations', icon: 'integrations' },
 ];

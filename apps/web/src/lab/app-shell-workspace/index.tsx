@@ -3,6 +3,7 @@
 import {
   useId, useLayoutEffect, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent,
 } from 'react';
+import { ChatComposer } from './composer';
 import { ShellIcon } from './icons';
 import { changelog, navigation, projects, setup, sources, tools } from './content';
 import {
@@ -148,7 +149,7 @@ function WorkspacePanel({ onOpen }: { onOpen: (label: string) => void }) {
 export default function AppShellWorkspaceExperiment() {
   const [panes, dispatch] = useReducer(paneReducer, initialPanes);
   const { sidebar, workspace, mode } = panes;
-  const [active, setActive] = useState('New chat');
+  const [active, setActive] = useState('New design');
   const [newsIndex, setNewsIndex] = useState(0);
   const [setupOpen, setSetupOpen] = useState(false);
   const dismissButtons = useRef<(HTMLButtonElement | null)[]>([]);
@@ -408,7 +409,7 @@ export default function AppShellWorkspaceExperiment() {
         </aside>
         <section ref={pageElement} className={conversationStyles.page} aria-label="Conversation">
           <div className={conversationStyles.pageHeader}>
-            <span><ShellIcon name="project" size={15} aria-hidden="true" /> {active === 'New chat' ? 'Website refresh' : active}</span>
+            <span><ShellIcon name="project" size={15} aria-hidden="true" /> {active === 'New design' ? 'Website refresh' : active}</span>
             <span className={conversationStyles.draft}>Draft</span>
           </div>
           <div className={conversationStyles.conversation}>
@@ -436,21 +437,15 @@ export default function AppShellWorkspaceExperiment() {
               </div>
             </article>
           </div>
-          <form
-            className={conversationStyles.composer}
-            onSubmit={(event) => {
-              event.preventDefault();
-              setNotice('Preview message received.');
-            }}
-          >
-            <textarea aria-label="Message OpenDesign" placeholder="What would you like to explore?" rows={2} />
-            <div>
-              <span>Local design preview</span>
-              <button type="submit" className={`${frameStyles.iconButton} ${conversationStyles.sendButton}`} aria-label="Send preview message">
-                <ShellIcon name="arrowUp" size={16} aria-hidden="true" />
-              </button>
-            </div>
-          </form>
+          <ChatComposer
+            onSend={(message, { model }) => setNotice(`Preview message received with ${model}: ${message}`)}
+            onRequest={(request) => setNotice({
+              attach: 'Attachment picker requested in this local design preview.',
+              'select-project': 'Project picker requested in this local design preview.',
+              'connect-apps': 'App connection demo started. No accounts are connected.',
+              'request-approval': 'Approval demo started. No permissions are changed.',
+            }[request])}
+          />
         </section>
         <aside
           ref={workspaceElement}
